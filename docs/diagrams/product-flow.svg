@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 420" width="680" height="420" role="img" aria-labelledby="t d">
+<title id="t">RAG 知识库问答产品架构</title>
+<desc id="d">三栏等宽横排：左栏知识沉淀（建库）、中栏知识索引、右栏提问获答（检索）。左栏结果入库，检索时从索引召回，最终输出可核对答案。</desc>
+
+<defs>
+  <marker id="gw" viewBox="0 0 10 10" refX="8.6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2.4 1.2L7.8 5L2.4 8.8" fill="none" stroke="#B8955A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+  <marker id="gt" viewBox="0 0 10 10" refX="8.6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2.4 1.2L7.8 5L2.4 8.8" fill="none" stroke="#3E8468" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+  <marker id="gp" viewBox="0 0 10 10" refX="8.6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2.4 1.2L7.8 5L2.4 8.8" fill="none" stroke="#6B5FA8" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+</defs>
+
+<rect x="0" y="0" width="680" height="420" fill="#FFFFFF"/>
+
+<!-- 栏标签 -->
+<text x="28" y="22" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8" fill="#B8BCC4" letter-spacing="2">BUILD</text>
+<text x="28" y="40" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#3A3F47">知识沉淀</text>
+
+<text x="244" y="22" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8" fill="#B8BCC4" letter-spacing="2">STORE</text>
+<text x="244" y="40" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#3A3F47">知识索引</text>
+
+<text x="460" y="22" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8" fill="#B8BCC4" letter-spacing="2">QUERY</text>
+<text x="460" y="40" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#3A3F47">提问获答</text>
+
+<!-- 左栏：建库 4 步 -->
+<rect x="28" y="56" width="192" height="46" rx="7" fill="#FFFCF7" stroke="#EBD9B8" stroke-width="0.9"/>
+<text x="42" y="74" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#2B2F36">上传文档</text>
+<text x="206" y="74" text-anchor="end" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8.5" fill="#A8895C">9 类格式</text>
+<text x="42" y="90" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8.5" fill="#B29A73">报告 / 手册 / 台账</text>
+
+<line x1="124" y1="102" x2="124" y2="114" stroke="#B8955A" stroke-width="1" marker-end="url(#gw)"/>
+
+<rect x="28" y="114" width="192" height="46" rx="7" fill="#FFFCF7" stroke="#EBD9B8" stroke-width="0.9"/>
+<text x="42" y="132" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#2B2F36">理解内容</text>
+<text x="206" y="132" text-anchor="end" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8.5" fill="#A8895C">结构还原</text>
+<text x="42" y="148" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8.5" fill="#B29A73">标题层级 · 表格行</text>
+
+<line x1="124" y1="160" x2="124" y2="172" stroke="#B8955A" stroke-width="1" marker-end="url(#gw)"/>
+
+<rect x="28" y="172" width="192" height="46" rx="7" fill="#FFFCF7" stroke="#EBD9B8" stroke-width="0.9"/>
+<text x="42" y="190" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#2B2F36">建立索引</text>
+<text x="206" y="190" text-anchor="end" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8.5" fill="#A8895C">语义可检索</text>
+<text x="42" y="206" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8.5" fill="#B29A73">按章节与表格行定位</text>
+
+<line x1="124" y1="218" x2="124" y2="230" stroke="#B8955A" stroke-width="1" marker-end="url(#gw)"/>
+
+<rect x="28" y="230" width="192" height="46" rx="7" fill="#FFFCF7" stroke="#EBD9B8" stroke-width="0.9"/>
+<text x="42" y="248" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#2B2F36">质量确认</text>
+<text x="206" y="248" text-anchor="end" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8.5" fill="#A8895C">可诊断</text>
+<text x="42" y="264" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8.5" fill="#B29A73">解析健康度一眼可见</text>
+
+<!-- 入库箭头 -->
+<path d="M220 166 L240 166" fill="none" stroke="#B8955A" stroke-width="1.1" marker-end="url(#gw)"/>
+<text x="230" y="154" text-anchor="middle" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="7.5" fill="#A8895C">入库</text>
+
+<!-- 中栏：知识索引卡 -->
+<rect x="244" y="56" width="192" height="220" rx="8" fill="#FBFAFE" stroke="#CFC8E8" stroke-width="0.9"/>
+<line x1="244" y1="96" x2="436" y2="96" stroke="#E6E1F5" stroke-width="0.8"/>
+<text x="260" y="78" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8" fill="#9C94C4" letter-spacing="1.5">CONTAINS</text>
+
+<circle cx="262" cy="118" r="2.5" fill="#6B5FA8"/>
+<text x="272" y="118" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="9.5" fill="#33305A">文档语义</text>
+<text x="422" y="118" text-anchor="end" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8.5" fill="#8C86B4">按意思找</text>
+
+<circle cx="262" cy="154" r="2.5" fill="#6B5FA8"/>
+<text x="272" y="154" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="9.5" fill="#33305A">关键信息</text>
+<text x="422" y="154" text-anchor="end" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8.5" fill="#8C86B4">编号型号</text>
+
+<circle cx="262" cy="190" r="2.5" fill="#6B5FA8"/>
+<text x="272" y="190" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="9.5" fill="#33305A">原文片段</text>
+<text x="422" y="190" text-anchor="end" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8.5" fill="#8C86B4">答案出处</text>
+
+<circle cx="262" cy="226" r="2.5" fill="#6B5FA8"/>
+<text x="272" y="226" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="9.5" fill="#33305A">出处坐标</text>
+<text x="422" y="226" text-anchor="end" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8.5" fill="#8C86B4">页码行号</text>
+
+<line x1="244" y1="248" x2="436" y2="248" stroke="#E6E1F5" stroke-width="0.8"/>
+<text x="260" y="265" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8.5" fill="#9C94C4">按库隔离 · 可重建</text>
+
+<!-- 召回箭头 -->
+<path d="M436 166 L460 166" fill="none" stroke="#6B5FA8" stroke-width="1.4" marker-end="url(#gp)"/>
+<text x="448" y="154" text-anchor="middle" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="7.5" fill="#6B5FA8">召回</text>
+
+<!-- 右栏：检索 4 步 -->
+<rect x="460" y="56" width="192" height="46" rx="7" fill="#F8FDFB" stroke="#BEE3D6" stroke-width="0.9"/>
+<text x="474" y="74" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#163A2E">提出问题</text>
+<text x="638" y="74" text-anchor="end" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8.5" fill="#4E8B77">多轮</text>
+<text x="474" y="90" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8.5" fill="#6FA595">不必重复上一句</text>
+
+<line x1="556" y1="102" x2="556" y2="114" stroke="#3E8468" stroke-width="1" marker-end="url(#gt)"/>
+
+<rect x="460" y="114" width="192" height="46" rx="7" fill="#F8FDFB" stroke="#BEE3D6" stroke-width="0.9"/>
+<text x="474" y="132" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#163A2E">查找依据</text>
+<text x="638" y="132" text-anchor="end" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8.5" fill="#4E8B77">只在本库</text>
+<text x="474" y="148" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8.5" fill="#6FA595">双路召回 · 选出最相关</text>
+
+<line x1="556" y1="160" x2="556" y2="172" stroke="#3E8468" stroke-width="1" marker-end="url(#gt)"/>
+
+<rect x="460" y="172" width="192" height="46" rx="7" fill="#F8FDFB" stroke="#BEE3D6" stroke-width="0.9"/>
+<text x="474" y="190" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#163A2E">组织回答</text>
+<text x="638" y="190" text-anchor="end" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8.5" fill="#4E8B77">依据驱动</text>
+<text x="474" y="206" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8.5" fill="#6FA595">没依据就说没有</text>
+
+<line x1="556" y1="218" x2="556" y2="230" stroke="#3E8468" stroke-width="1" marker-end="url(#gt)"/>
+
+<rect x="460" y="230" width="192" height="46" rx="7" fill="#F4F9FE" stroke="#BFD6EA" stroke-width="0.9"/>
+<text x="474" y="248" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" fill="#13334D">答案</text>
+<text x="638" y="248" text-anchor="end" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8.5" fill="#5583A8">带来源</text>
+<text x="474" y="264" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8.5" fill="#6E9CC0">点引用回到原文</text>
+
+<!-- 底部分隔 + 交付承诺 -->
+<line x1="28" y1="302" x2="652" y2="302" stroke="#F2F5F8" stroke-width="0.8"/>
+
+<rect x="28" y="320" width="624" height="42" rx="7" fill="#F6FCF9" stroke="#B7DECF" stroke-width="0.9"/>
+<text x="46" y="341" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" font-weight="500" fill="#163A2E">可核对</text>
+<text x="634" y="341" text-anchor="end" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8.5" fill="#4E8B77">对答案负责</text>
+<text x="46" y="356" dominant-baseline="central" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8.5" fill="#6FA595">每个结论都能查到出处，查不到的不说</text>
+
+<!-- 脚注 -->
+<text x="28" y="390" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8.5" fill="#8B97A4">建库是一次性的，检索是每次提问都要走一遍的。左边做对是及格线，右边做对才有产品价值。</text>
+<text x="28" y="406" font-family="-apple-system,'PingFang SC','Microsoft YaHei',sans-serif" font-size="8.5" fill="#A5B1BD">这是检索系统，不是全知助手 —— 它不猜、不补全，只在你的知识里找依据。</text>
+</svg>
