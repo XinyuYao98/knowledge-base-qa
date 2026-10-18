@@ -1,0 +1,26 @@
+# 统一换行符，避免 Windows/Linux 协作时 diff 出现整文件变更
+* text=auto eol=lf
+
+# 二进制文件不做换行符转换
+*.png   binary
+*.jpg   binary
+*.gif   binary
+*.ico   binary
+*.pdf   binary
+*.xlsx  binary
+*.xls   binary
+*.docx  binary
+*.pptx  binary
+*.gguf  binary
+
+# Windows 专用脚本保留 CRLF
+*.bat   text eol=crlf
+*.ps1   text eol=crlf
+
+# Shell 脚本必须是 LF，否则容器里会报 bad interpreter
+*.sh    text eol=lf
+Makefile text eol=lf
+
+# 锁文件不参与 diff 统计
+package-lock.json linguist-generated=true
+pnpm-lock.yaml    linguist-generated=true
