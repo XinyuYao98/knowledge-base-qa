@@ -1,0 +1,68 @@
+{
+  "csv_gbk_export.csv": {
+    "block_count": 1,
+    "total_chars": 202,
+    "table_count": 1,
+    "status": "ok"
+  },
+  "docx_heading_table.docx": {
+    "block_count": 12,
+    "total_chars": 251,
+    "table_count": 1,
+    "status": "ok"
+  },
+  "empty.txt": {
+    "block_count": 0,
+    "total_chars": 0,
+    "table_count": 0,
+    "status": "error"
+  },
+  "md_with_table.md": {
+    "block_count": 13,
+    "total_chars": 333,
+    "table_count": 1,
+    "status": "ok"
+  },
+  "pdf_scanned_no_text.pdf": {
+    "block_count": 0,
+    "total_chars": 0,
+    "table_count": 0,
+    "status": "error"
+  },
+  "pptx_notes_heavy.pptx": {
+    "block_count": 3,
+    "total_chars": 297,
+    "table_count": 0,
+    "status": "ok"
+  },
+  "txt_gbk_chinese.txt": {
+    "block_count": 4,
+    "total_chars": 246,
+    "table_count": 0,
+    "status": "ok"
+  },
+  "xlsx_merged_cells.xlsx": {
+    "block_count": 1,
+    "total_chars": 150,
+    "table_count": 1,
+    "status": "ok"
+  },
+  "xlsx_multi_tables.xlsx": {
+    "block_count": 2,
+    "total_chars": 105,
+    "table_count": 2,
+    "status": "ok"
+  },
+  "2025年全国科技经费投入统计公报 - 国家统计局.html": {
+    "block_count": 68,
+    "total_chars": 8865,
+    "table_count": 6,
+    "status": "ok"
+  },
+  "上海汇通能源股份有限公司2026年第三季度报告.pdf": {
+    "block_count": 32,
+    "total_chars": 20706,
+    "table_count": 13,
+    "status": "ok"
+  }
+}
