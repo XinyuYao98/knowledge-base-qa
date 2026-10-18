@@ -1,0 +1,87 @@
+[project]
+name = "kb-qa-backend"
+version = "0.1.0"
+description = "RAG 知识库问答系统 — 后端"
+requires-python = ">=3.11,<3.14"
+
+dependencies = [
+    # Web
+    "fastapi==0.143.3",
+    "uvicorn[standard]==0.54.0",
+    "python-multipart==0.0.32",
+    # 配置与校验
+    "pydantic==2.14.1",
+    "pydantic-settings==2.16.0",
+    # 数据库
+    # 必须带 [asyncio]：否则缺 greenlet，异步引擎在运行时报 ImportError
+    "SQLAlchemy[asyncio]==2.1.5",
+    "psycopg[binary]==3.3.6",
+    "psycopg-pool==3.3.3",
+    "alembic==1.20.0",
+    # 缓存
+    "redis==8.1.0",
+    # HTTP 与重试
+    "httpx==0.28.1",
+    "tenacity==9.2.1",
+    # 日志与观测
+    "structlog==26.1.0",
+    # 文本处理
+    "tiktoken==0.14.0",
+    "jieba==0.42.1",
+    "rank-bm25==0.2.2",
+    "charset-normalizer==3.5.2",
+    # 安全
+    "PyJWT==2.15.1",
+    "argon2-cffi==25.1.0",
+    "cryptography==50.0.2",
+    # LangChain（仅 L1 组件层，不做编排）
+    "langchain-core==1.6.12",
+    "langchain-openai==1.7.2",
+    "langchain-chroma==1.1.0",
+    # 向量库客户端
+    "chromadb==1.5.9",
+    # 文档解析
+    "pypdf==6.21.0",
+    "pdfplumber==0.11.10",
+    "python-docx==1.2.0",
+    "python-pptx==1.0.2",
+    "openpyxl==3.1.5",
+    "markdown-it-py==4.2.0",
+    "beautifulsoup4==4.15.0",
+    "lxml==6.1.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "ruff==0.17.1",
+    # 让单测不依赖真实 Redis
+    "fakeredis==2.40.0",
+]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+# Windows 上 psycopg 不支持 ProactorEventLoop；交给 conftest 的插件统一替换
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+exclude = ["migrations"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["E501"]
