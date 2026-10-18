@@ -1,0 +1,36 @@
+{
+  "generated_by": "scripts/make_fixtures.py",
+  "note": "合成样例，内容全部虚构；期望输出与文件同源生成，不要手改其中一个",
+  "items": [
+    {
+      "file": "xlsx_merged_cells.xlsx",
+      "format": "xlsx",
+      "test_focus": "合并单元格 + 双行表头 + 行级切块"
+    },
+    {
+      "file": "xlsx_multi_tables.xlsx",
+      "format": "xlsx",
+      "test_focus": "空行分隔的多张逻辑表"
+    },
+    {
+      "file": "pdf_scanned_no_text.pdf",
+      "format": "pdf",
+      "test_focus": "扫描件（无文字层）必须明确报错"
+    },
+    {
+      "file": "pptx_notes_heavy.pptx",
+      "format": "pptx",
+      "test_focus": "notes_slide 提取（备注内容远多于正文）"
+    },
+    {
+      "file": "txt_gbk_chinese.txt",
+      "format": "txt",
+      "test_focus": "GBK 编码识别"
+    },
+    {
+      "file": "empty.txt",
+      "format": "txt",
+      "test_focus": "空文件必须拒绝"
+    }
+  ]
+}

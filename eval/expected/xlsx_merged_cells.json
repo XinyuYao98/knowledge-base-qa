@@ -1,0 +1,46 @@
+{
+  "file": "xlsx_merged_cells.xlsx",
+  "format": "xlsx",
+  "test_focus": "合并单元格 + 双行表头 + 行级切块",
+  "sheet_names": [
+    "区域销售"
+  ],
+  "expected_table": {
+    "header_rows": [
+      [
+        "区域",
+        "负责人",
+        "季度销售",
+        null,
+        "备注"
+      ],
+      [
+        null,
+        null,
+        "Q1",
+        "Q2",
+        null
+      ]
+    ],
+    "data_row_count": 4,
+    "first_data_row": [
+      "华东",
+      "林绍安",
+      1280.5,
+      1432.8,
+      "含税"
+    ],
+    "merged_cell_inherited": {
+      "row_index": 4,
+      "column": "区域",
+      "expected_value": "华东",
+      "why": "A3:A4 合并，第 4 行原值为 None，解析后应继承为华东"
+    }
+  },
+  "assertions": [
+    "第一个 chunk 的 heading_path 含 '区域销售'",
+    "存在包含 '华东' 与 '1280.5' 的 chunk",
+    "存在包含 '华南' 与 '875.3' 的 chunk",
+    "每个数据行 chunk 都重复携带表头（Q1/Q2 字段名）"
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "file": "xlsx_multi_tables.xlsx",
+  "format": "xlsx",
+  "test_focus": "空行分隔的多张逻辑表",
+  "sheet_names": [
+    "汇总"
+  ],
+  "expected_table": {
+    "logical_table_count": 2,
+    "table_1": {
+      "header": [
+        "产品编号",
+        "名称",
+        "单价"
+      ],
+      "rows": 2,
+      "first_row": [
+        "P-001",
+        "智能网关",
+        1280.0
+      ]
+    },
+    "table_2": {
+      "header": [
+        "园区",
+        "装机数",
+        "投运年份"
+      ],
+      "rows": 2,
+      "first_row": [
+        "苏州园区",
+        128,
+        2024
+      ]
+    }
+  },
+  "assertions": [
+    "解析结果含两张表的表头，且不被合并成一张",
+    "存在包含 'P-001' 的 chunk",
+    "存在包含 '苏州园区' 的 chunk",
+    "表 2 的 chunk 不应混入 'P-001'"
+  ]
+}

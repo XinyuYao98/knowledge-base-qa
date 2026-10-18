@@ -1,0 +1,14 @@
+{
+  "file": "empty.txt",
+  "format": "txt",
+  "test_focus": "空文件必须拒绝",
+  "expected": {
+    "should_raise": true,
+    "error_code": "empty_file",
+    "size_bytes": 0
+  },
+  "assertions": [
+    "解析抛出 ParseError，code == 'empty_file'",
+    "不得生成任何 chunk"
+  ]
+}

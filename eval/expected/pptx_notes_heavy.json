@@ -1,0 +1,39 @@
+{
+  "file": "pptx_notes_heavy.pptx",
+  "format": "pptx",
+  "test_focus": "notes_slide 提取（备注内容远多于正文）",
+  "slide_count": 3,
+  "expected": {
+    "pages": [
+      {
+        "index": 1,
+        "title": "经营目标",
+        "notes_contains": [
+          "8600 万元",
+          "32%"
+        ]
+      },
+      {
+        "index": 2,
+        "title": "关键动作",
+        "notes_contains": [
+          "12 个地级市",
+          "14 天"
+        ]
+      },
+      {
+        "index": 3,
+        "title": "风险提示",
+        "notes_contains": [
+          "14 周",
+          "6 人"
+        ]
+      }
+    ]
+  },
+  "assertions": [
+    "每页 chunk 都包含 notes 中的关键数字",
+    "chunk 的 page 字段等于 slide 序号（1/2/3）",
+    "备注内容不得丢失（含 8600 万元、12 个地级市、14 周）"
+  ]
+}
