@@ -1,0 +1,146 @@
+# ============================================================================
+# 分发环境编排：一键起全套（含 Chroma 服务）
+# 用法：docker compose up
+#
+# 注意：模型服务（LM Studio / llama-cpp-python）不在本编排内，
+# 需用户在本机自行启动，再通过 EMBED_BASE_URL 指向它。
+# 原因：模型服务需要 GPU，而 Docker 的 GPU 透传在 Windows 上不可用。
+# ============================================================================
+
+name: kbqa
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: kbqa-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请在 .env 中设置}
+      POSTGRES_DB: kbqa
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d kbqa"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: kbqa-redis
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+    command: ["redis-server", "--appendonly", "no", "--save", ""]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  chroma:
+    image: chromadb/chroma:1.5.9
+    container_name: kbqa-chroma
+    restart: unless-stopped
+    environment:
+      IS_PERSISTENT: "TRUE"
+      PERSIST_DIRECTORY: /data
+      ANONYMIZED_TELEMETRY: "FALSE"
+    volumes:
+      - chromadata:/data
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/8000' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: kbqa-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      chroma:
+        condition: service_healthy
+    environment:
+      APP_ENV: ${APP_ENV:-prod}
+      DATABASE_URL: postgresql+psycopg://kbapp:${KB_APP_PASSWORD:?}@postgres:5432/kbqa
+      REDIS_URL: redis://redis:6379/0
+      CHROMA_MODE: http
+      CHROMA_HOST: chroma
+      CHROMA_PORT: 8000
+      STORAGE_ROOT: /data
+      JWT_SECRET: ${JWT_SECRET:?}
+      FERNET_KEY: ${FERNET_KEY:?}
+      # 指向宿主机上的模型服务（Windows 下 host.docker.internal 可用）
+      EMBED_BASE_URL: ${EMBED_BASE_URL:-http://host.docker.internal:1234/v1}
+      EMBED_MODEL: ${EMBED_MODEL:-qwen3-embedding-4b}
+      EMBED_DIM: ${EMBED_DIM:-2560}
+      RERANK_BASE_URL: ${RERANK_BASE_URL:-http://host.docker.internal:1234/v1}
+    ports:
+      - "8080:8080"
+    volumes:
+      - appdata:/data
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: kbqa-worker
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      APP_ENV: ${APP_ENV:-prod}
+      DATABASE_URL: postgresql+psycopg://kbapp:${KB_APP_PASSWORD:?}@postgres:5432/kbqa
+      REDIS_URL: redis://redis:6379/0
+      CHROMA_MODE: http
+      CHROMA_HOST: chroma
+      CHROMA_PORT: 8000
+      STORAGE_ROOT: /data
+      JWT_SECRET: ${JWT_SECRET:?}
+      FERNET_KEY: ${FERNET_KEY:?}
+      EMBED_BASE_URL: ${EMBED_BASE_URL:-http://host.docker.internal:1234/v1}
+      EMBED_MODEL: ${EMBED_MODEL:-qwen3-embedding-4b}
+      EMBED_DIM: ${EMBED_DIM:-2560}
+      RERANK_BASE_URL: ${RERANK_BASE_URL:-http://host.docker.internal:1234/v1}
+    volumes:
+      - appdata:/data
+    command: ["python", "-m", "app.workers.ingest_worker", "--concurrency", "2"]
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: kbqa-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NEXT_PUBLIC_API_BASE: /api/v1
+      API_INTERNAL: http://api:8080
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
+    name: kbqa-pgdata
+  redisdata:
+    name: kbqa-redisdata
+  chromadata:
+    name: kbqa-chromadata
+  appdata:
+    name: kbqa-appdata

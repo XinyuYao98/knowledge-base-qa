@@ -1,0 +1,62 @@
+# ============================================================================
+# 开发环境编排：只起基础设施，应用在宿主机跑（便于调试）
+# 用法：docker compose -f docker-compose.dev.yml up -d
+#
+# 端口选择说明：
+#   5433 / 6380 —— 避开本机已占用的 5432（其他项目的 PG）与 6379
+#   如你的机器上这些端口也冲突，改 .env 里的 POSTGRES_PORT / REDIS_PORT
+# ============================================================================
+
+name: kbqa-dev
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: kbqa-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_dev_pwd}
+      POSTGRES_DB: kbqa
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      # 宿主机 5433 → 容器 5432
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d kbqa"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 15s
+    command:
+      - postgres
+      - -c
+      - max_connections=100
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - lc_messages=C
+
+  redis:
+    image: redis:7-alpine
+    container_name: kbqa-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
+    volumes:
+      - redisdata:/data
+    # 本项目 Redis 只做限流与上传会话，不需要持久化
+    command: ["redis-server", "--appendonly", "no", "--save", ""]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+volumes:
+  pgdata:
+    name: kbqa-pgdata
+  redisdata:
+    name: kbqa-redisdata
