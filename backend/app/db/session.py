@@ -15,6 +15,7 @@ RLS 的关键：每个请求必须在**同一连接**上先 `SET LOCAL app.user_
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -84,10 +85,52 @@ async def user_session(user_id: str | None) -> AsyncIterator[AsyncSession]:
 
 @asynccontextmanager
 async def system_session() -> AsyncIterator[AsyncSession]:
-    """给 worker / 后台任务用：调用方需自行 `set_config` 指定身份。"""
+    """给 worker / 后台任务用：**调用方需自行 `set_config` 指定身份**。
+
+    直接用它写业务表会被 RLS 拦住（这是对的）。
+    需要代表某个用户操作时，用 `as_user()`。
+    """
     factory = get_session_factory()
     async with factory() as session, session.begin():
         yield session
+
+
+@asynccontextmanager
+async def as_user(user_id: str | uuid.UUID) -> AsyncIterator[AsyncSession]:
+    """代表某个用户开启会话（含 RLS 上下文）。
+
+    ## worker 为什么需要这个
+
+    worker 是后台任务，不是用户请求，但它要写 `documents` / `chunks`，
+    这两张表都有 RLS 策略 `user_id = current_setting('app.user_id')`。
+
+    不设置这个上下文，插入会报：
+
+        InsufficientPrivilege: new row violates row-level security policy
+
+    实测踩过（P4 集成测试）。这不是 bug，是 RLS 在正常工作 ——
+    修的方向不是关掉 RLS，而是让 worker 显式声明「我在替哪个用户干活」。
+    """
+    factory = get_session_factory()
+    uid = str(user_id)
+    async with factory() as session, session.begin():
+        await session.execute(
+            text("SELECT set_config('app.user_id', :uid, true)"),
+            {"uid": uid},
+        )
+        yield session
+
+
+async def set_session_user(session: AsyncSession, user_id: str | uuid.UUID) -> None:
+    """在**已有事务**里设置 RLS 上下文。
+
+    用于测试或多表操作时，不想为每个操作开新会话的场景。
+    必须在 `session.begin()` 之后调用（`is_local=true` 依赖事务）。
+    """
+    await session.execute(
+        text("SELECT set_config('app.user_id', :uid, true)"),
+        {"uid": str(user_id)},
+    )
 
 
 async def db_healthcheck() -> dict[str, Any]:

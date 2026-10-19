@@ -70,6 +70,17 @@ class Settings(BaseSettings):
     STORAGE_ROOT: str = "./data"
 
     # ------------------------------------------------------------------
+    # 索引 Worker
+    # ------------------------------------------------------------------
+    #: 一个 worker 进程内并发处理的任务数。
+    #: 不要设太大：embedding 服务本身并发能力有限，压太多反而排队。
+    WORKER_CONCURRENCY: int = 2
+    #: 队列为空时的轮询间隔（秒）
+    WORKER_POLL_INTERVAL: float = 2.0
+    #: 单文档索引超时（秒）。403 块的 PDF 实测约 2 分钟，留足余量。
+    INDEX_TIMEOUT_SECONDS: float = 600.0
+
+    # ------------------------------------------------------------------
     # 安全
     # ------------------------------------------------------------------
     JWT_SECRET: str = Field(default="dev-only-change-me-in-production-please")
