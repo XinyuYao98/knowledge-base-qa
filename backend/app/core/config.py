@@ -240,7 +240,26 @@ class Settings(BaseSettings):
 
     @property
     def storage_root(self) -> Path:
-        return Path(self.STORAGE_ROOT).resolve()
+        """存储根目录，**始终相对项目根解析**。
+
+        不能直接 `Path(STORAGE_ROOT).resolve()`：
+        `./data` 会按当前工作目录解析，导致在 `backend/` 下跑脚本时
+        指到 `backend/data`，与在项目根跑时的 `项目/data` 变成两套数据。
+
+        实测踩过：管道在项目根写入，读质量报告时在 backend 下读不到。
+
+        规则：
+        - 绝对路径 → 原样使用
+        - 相对路径 → 相对项目根（ROOT_DIR）
+        """
+        p = Path(self.STORAGE_ROOT)
+        return p.resolve() if p.is_absolute() else (ROOT_DIR / p).resolve()
+
+    @property
+    def chroma_path(self) -> Path:
+        """Chroma 持久化目录。同 storage_root，相对路径按项目根解析。"""
+        p = Path(self.CHROMA_PATH)
+        return p.resolve() if p.is_absolute() else (ROOT_DIR / p).resolve()
 
     @property
     def files_dir(self) -> Path:

@@ -245,7 +245,7 @@ async def health_deps() -> dict[str, Any]:
         if settings.CHROMA_MODE == "http":
             client = chromadb.HttpClient(host=settings.CHROMA_HOST, port=settings.CHROMA_PORT)
         else:
-            client = chromadb.PersistentClient(path=settings.CHROMA_PATH)
+            client = chromadb.PersistentClient(path=str(settings.chroma_path))
         client.heartbeat()
         out["chroma"]["reachable"] = True
     except Exception as e:

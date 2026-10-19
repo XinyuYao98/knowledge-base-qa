@@ -52,7 +52,7 @@ def get_client() -> chromadb.api.ClientAPI:
         )
     else:
         _client = chromadb.PersistentClient(
-            path=settings.CHROMA_PATH,
+            path=str(settings.chroma_path),
             settings=ChromaSettings(anonymized_telemetry=False),
         )
     return _client
