@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from contextlib import asynccontextmanager
 import hashlib
 import shutil
 import sys
@@ -35,7 +36,7 @@ from app.core.config import settings  # noqa: E402
 from app.core.platform import assert_event_loop_compatible, selector_loop_factory  # noqa: E402
 from app.core.security import hash_password  # noqa: E402
 from app.db.repos import DocumentRepo, JobRepo  # noqa: E402
-from app.db.session import get_session_factory  # noqa: E402
+from app.db.session import get_session_factory, set_session_user  # noqa: E402
 from app.index import chroma_store  # noqa: E402
 from app.rag.parsers.dispatcher import SUPPORTED_EXTENSIONS  # noqa: E402
 from app.workers.ingest_worker import Worker  # noqa: E402
@@ -45,49 +46,65 @@ TEST_PASSWORD = "test1234"
 TEST_KB_NAME = "P4 测试库"
 
 
-async def _ensure_user_kb() -> tuple[str, str]:
-    """建（或复用）测试用户与知识库，返回 (user_id, kb_id)。"""
-    factory = get_session_factory()
-    async with factory() as s:
-        async with s.begin():
-            row = await s.execute(
-                text("SELECT id FROM users WHERE username = :u"), {"u": TEST_USER}
-            )
-            user_id = row.scalar_one_or_none()
-            if user_id is None:
-                row = await s.execute(
-                    text(
-                        "INSERT INTO users (username, password_hash) "
-                        "VALUES (:u, :p) RETURNING id"
-                    ),
-                    {"u": TEST_USER, "p": hash_password(TEST_PASSWORD)},
-                )
-                user_id = row.scalar_one()
-                print(f"  建用户 {TEST_USER}（密码 {TEST_PASSWORD}）")
+def _ensure_user_kb_sync() -> tuple[str, str]:
+    """建（或复用）测试用户与知识库，返回 (user_id, kb_id)。
 
-            row = await s.execute(
-                text(
-                    "SELECT id FROM knowledge_bases WHERE user_id = :u AND name = :n"
-                ),
-                {"u": user_id, "n": TEST_KB_NAME},
+    **必须用管理员连接**：users 表在 RLS 保护下，且策略只允许
+    `id = current_setting('app.user_id')` —— 应用角色连自己的用户都插不进去。
+
+    这不矛盾：注册用户属于「系统操作」，真实 API 会通过
+    SECURITY DEFINER 函数或管理员连接完成，不走应用角色的普通会话。
+    """
+    with _admin_conn() as conn, conn.cursor() as cur:
+        cur.execute("SELECT id FROM users WHERE username = %s", (TEST_USER,))
+        row = cur.fetchone()
+        if row is None:
+            cur.execute(
+                "INSERT INTO users (username, password_hash) VALUES (%s, %s) RETURNING id",
+                (TEST_USER, hash_password(TEST_PASSWORD)),
             )
-            kb_id = row.scalar_one_or_none()
-            if kb_id is None:
-                row = await s.execute(
-                    text(
-                        "INSERT INTO knowledge_bases (user_id, name, quota_bytes) "
-                        "VALUES (:u, :n, :q) RETURNING id"
-                    ),
-                    {"u": user_id, "n": TEST_KB_NAME, "q": settings.KB_QUOTA_BYTES},
-                )
-                kb_id = row.scalar_one()
-                print(f"  建知识库「{TEST_KB_NAME}」")
+            user_id = cur.fetchone()[0]
+            print(f"  建用户 {TEST_USER}（密码 {TEST_PASSWORD}）")
+        else:
+            user_id = row[0]
+
+        cur.execute(
+            "SELECT id FROM knowledge_bases WHERE user_id = %s AND name = %s",
+            (user_id, TEST_KB_NAME),
+        )
+        row = cur.fetchone()
+        if row is None:
+            cur.execute(
+                "INSERT INTO knowledge_bases (user_id, name, quota_bytes) "
+                "VALUES (%s, %s, %s) RETURNING id",
+                (user_id, TEST_KB_NAME, settings.KB_QUOTA_BYTES),
+            )
+            kb_id = cur.fetchone()[0]
+            print(f"  建知识库「{TEST_KB_NAME}」")
+        else:
+            kb_id = row[0]
+
     return str(user_id), str(kb_id)
+
+
+@asynccontextmanager
+async def user_tx(user_id: str):
+    """带 RLS 上下文的会话 —— 所有业务表读写都要走这里。"""
+    factory = get_session_factory()
+    async with factory() as s, s.begin():
+        await set_session_user(s, user_id)
+        yield s
+
+
+def _admin_conn():
+    import psycopg
+
+    return psycopg.connect(settings.DATABASE_ADMIN_URL, autocommit=True, connect_timeout=5)
 
 
 async def cmd_setup(_args: argparse.Namespace) -> int:
     print("[setup]")
-    uid, kid = await _ensure_user_kb()
+    uid, kid = _ensure_user_kb_sync()
     print(f"  user_id = {uid}")
     print(f"  kb_id   = {kid}")
     print(f"\n下一步：python scripts/index_cli.py upload <文件> --kb {kid}")
@@ -113,46 +130,44 @@ async def cmd_upload(args: argparse.Namespace) -> int:
         print(f"不支持的格式 .{ext}", file=sys.stderr)
         return 2
 
-    uid, kid = await _ensure_user_kb()
+    uid, kid = _ensure_user_kb_sync()
     if args.kb:
         kid = args.kb
 
     sha = _sha256(src)
     size = src.stat().st_size
 
-    factory = get_session_factory()
-    async with factory() as s:
-        async with s.begin():
-            docs = DocumentRepo(s)
-            jobs = JobRepo(s)
+    async with user_tx(uid) as s:
+        docs = DocumentRepo(s)
+        jobs = JobRepo(s)
 
-            # 秒传：同库同内容直接复用
-            existing = await docs.find_by_sha(kid, sha)
-            if existing:
-                print(f"  内容已存在（秒传）：doc_id={existing['id']} status={existing['status']}")
-                if existing["status"] != "ready":
-                    await jobs.enqueue(document_id=existing["id"], user_id=uid)
-                    print("  已重新入队")
-                return 0
+        # 秒传：同库同内容直接复用
+        existing = await docs.find_by_sha(kid, sha)
+        if existing:
+            print(f"  内容已存在（秒传）：doc_id={existing['id']} status={existing['status']}")
+            if existing["status"] != "ready":
+                await jobs.enqueue(document_id=existing["id"], user_id=uid)
+                print("  已重新入队")
+            return 0
 
-            # 复制到存储目录
-            dest_dir = settings.files_dir / kid
-            dest_dir.mkdir(parents=True, exist_ok=True)
-            dest = dest_dir / f"{sha[:16]}{src.suffix}"
-            shutil.copy2(src, dest)
-            storage_key = str(dest.relative_to(settings.files_dir)).replace("\\", "/")
+        # 复制到存储目录
+        dest_dir = settings.files_dir / kid
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / f"{sha[:16]}{src.suffix}"
+        shutil.copy2(src, dest)
+        storage_key = str(dest.relative_to(settings.files_dir)).replace("\\", "/")
 
-            doc_id = await docs.create(
-                kb_id=kid,
-                user_id=uid,
-                filename=src.name,
-                mime="application/octet-stream",
-                ext=ext,
-                size_bytes=size,
-                sha256=sha,
-                storage_key=storage_key,
-            )
-            job_id = await jobs.enqueue(document_id=doc_id, user_id=uid)
+        doc_id = await docs.create(
+            kb_id=kid,
+            user_id=uid,
+            filename=src.name,
+            mime="application/octet-stream",
+            ext=ext,
+            size_bytes=size,
+            sha256=sha,
+            storage_key=storage_key,
+        )
+        job_id = await jobs.enqueue(document_id=doc_id, user_id=uid)
 
     print(f"  doc_id  = {doc_id}")
     print(f"  job_id  = {job_id}")
@@ -172,9 +187,7 @@ async def cmd_worker(args: argparse.Namespace) -> int:
 
 
 async def cmd_status(_args: argparse.Namespace) -> int:
-    factory = get_session_factory()
-    async with factory() as s:
-        async with s.begin():
+    async with user_tx(uid) as s:
             rows = await s.execute(
                 text(
                     """

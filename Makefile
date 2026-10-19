@@ -108,6 +108,10 @@ test: ## 跑全部单元测试（不需要模型服务）
 test-db: ## 跑需要真实数据库的测试（需先 db-up + db-init）
 	cd $(BACKEND) && ../$(PY) -m pytest -m db -v
 
+.PHONY: test-real
+test-real: ## 跑真模型端到端测试（需 LM Studio 加载 embedding 模型）
+	cd $(BACKEND) && ../$(PY) -m pytest -m "db and real_model" -v -s
+
 .PHONY: verify-rls
 verify-rls: ## 验证多租户 RLS 隔离是否真正生效（11 项检查）
 	$(PY) scripts/verify_rls.py
