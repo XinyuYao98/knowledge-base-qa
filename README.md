@@ -96,6 +96,7 @@ psycopg 异步模式不支持 Windows 默认的 ProactorEventLoop，
 | 文档 | 内容 |
 |---|---|
 | [`docs/02-架构方案.md`](docs/02-架构方案.md) | **主文档**：13 项核心决策、数据模型、API 契约、开发排期 |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | **研发规范**：分支策略、阶段验收与合并、提交格式、测试约束 |
 | [`docs/knowledge/技术说明.md`](docs/knowledge/技术说明.md) | 技术选型的解释性说明、RRF 原理与示例 |
 | [`docs/diagrams/product-flow.svg`](docs/diagrams/product-flow.svg) | 产品架构图 |
 | [`docs/diagrams/README.md`](docs/diagrams/README.md) | 架构图的栅格参数与改图规则 |
