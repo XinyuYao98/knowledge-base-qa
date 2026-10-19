@@ -153,8 +153,25 @@ reindex: ## 从 PG 全量重建 Chroma 与 BM25 索引
 
 .PHONY: reprocess
 reprocess: ## 单文档单阶段重跑：make reprocess DOC=xxx STAGE=chunk
-	@if [ -z "$(DOC)" ]; then echo "用法: make reprocess DOC=<document_id> STAGE=<parse|chunk|embed>"; exit 1; fi
-	cd $(BACKEND) && ../$(PY) -m app.services.reprocess --doc $(DOC) --stage $(STAGE)
+	@if [ -z "$(DOC)" ]; then echo "用法: make reprocess DOC=<document_id> STAGE=<parse|chunk|embed> [SRC=<源文件>]"; exit 1; fi
+	$(PY) scripts/pipeline_cli.py reprocess $(DOC) --stage $(STAGE) $(if $(SRC),--source $(SRC))
+
+.PHONY: pipeline
+pipeline: ## 跑完整管道：make pipeline FILE=path/to/doc.pdf
+	@if [ -z "$(FILE)" ]; then echo "用法: make pipeline FILE=<文件路径> [DOC=<自定义ID>]"; exit 1; fi
+	$(PY) scripts/pipeline_cli.py run "$(FILE)" $(if $(DOC),--doc-id $(DOC))
+
+.PHONY: pipeline-status
+pipeline-status: ## 查看中间产物状态：make pipeline-status DOC=xxx
+	$(PY) scripts/pipeline_cli.py status $(DOC)
+
+.PHONY: quality
+quality: ## 质量报告汇总（全部文档）
+	$(PY) scripts/pipeline_cli.py report
+
+.PHONY: clean
+clean: ## 清理过期数据（dry-run）；make clean APPLY=1 真删
+	$(PY) scripts/pipeline_cli.py clean $(if $(APPLY),--apply,)
 
 .PHONY: seed
 seed: ## 导入示例知识库（需模型服务在运行）
