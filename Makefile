@@ -132,6 +132,10 @@ parse-baseline: ## 更新解析基线并检查回归
 fixtures: ## 重新生成合成测试素材
 	$(PY) scripts/make_fixtures.py
 
+.PHONY: spike
+spike: ## 竖切片端到端验证（需要 LM Studio 已加载 embedding + chat 模型）
+	$(PY) scripts/spike.py
+
 .PHONY: lint
 lint: ## 代码检查
 	cd $(BACKEND) && ../$(VENV_BIN)/ruff check .
