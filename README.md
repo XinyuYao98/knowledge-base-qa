@@ -50,7 +50,44 @@
 
 ## 快速开始
 
-见 [`docs/QUICKSTART.md`](docs/QUICKSTART.md)：从零到问出第一句话，约 20 分钟。
+```bash
+cp .env.example .env      # 填 JWT_SECRET / FERNET_KEY / 数据库密码
+make db-up                # 起 PG + Redis
+make db-init              # 建表 + RLS + 应用角色
+make dev                  # 起后端（Windows 下必须用这个，见下方说明）
+```
+
+> **快速开始文档建设中** —— 完整链路（上传 → 索引 → 提问）要等竖切片完成后才能跑通。
+> 现在只能验证到「服务能起来、数据库能连」。
+
+**Windows 用户注意**：不要用 `uvicorn app.main:app` 直接启动。
+psycopg 异步模式不支持 Windows 默认的 ProactorEventLoop，
+`make dev` 走的是 `scripts/dev.py`，它自己控制事件循环。
+
+---
+
+## 支持的文档格式
+
+| 格式 | 状态 | 说明 |
+|---|---|---|
+| PDF | ✅ | 正文用 pypdf，表格用 pdfplumber |
+| Word `.docx` | ✅ | 保留标题层级、表格、列表 |
+| Excel `.xlsx` | ✅ | **合并单元格自动展开**，双行表头自动压平 |
+| PPT `.pptx` | ✅ | **备注（notes）一并提取** |
+| CSV / TSV | ✅ | 编码自动识别（GBK/UTF-8） |
+| Markdown | ✅ | 标题层级、代码块、表格 |
+| TXT / LOG | ✅ | 编码自动识别 |
+| HTML | ✅ | 正文容器识别，剔除导航与脚本 |
+| 扫描件 PDF | ❌ | **明确报错并提示不支持 OCR**，不会静默返回空内容 |
+| `.doc/.xls/.ppt` | ❌ | 老格式，提示另存为新格式 |
+
+**已知解析风险**（如实记录，不是待修 bug）：
+
+| 风险 | 说明 |
+|---|---|
+| 双栏 PDF 阅读顺序 | pypdf 按物理流顺序输出，双栏可能左右串行。**素材库暂无真正的双栏样例，未验证** |
+| 复杂表格 | 无边框表格、跨页表格可能识别失败，会产出 `table_detect_failed` 告警 |
+| Excel 公式 | 若文件从未被 Excel 打开过，公式单元格没有缓存值，会产出 `formula_no_cache` 告警 |
 
 ---
 
@@ -59,6 +96,7 @@
 | 文档 | 内容 |
 |---|---|
 | [`docs/02-架构方案.md`](docs/02-架构方案.md) | **主文档**：13 项核心决策、数据模型、API 契约、开发排期 |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | **研发规范**：分支策略、阶段验收与合并、提交格式、测试约束 |
 | [`docs/knowledge/技术说明.md`](docs/knowledge/技术说明.md) | 技术选型的解释性说明、RRF 原理与示例 |
 | [`docs/diagrams/product-flow.svg`](docs/diagrams/product-flow.svg) | 产品架构图 |
 | [`docs/diagrams/README.md`](docs/diagrams/README.md) | 架构图的栅格参数与改图规则 |

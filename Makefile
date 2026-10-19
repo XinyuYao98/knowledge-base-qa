@@ -117,8 +117,20 @@ verify-rls: ## 验证多租户 RLS 隔离是否真正生效（11 项检查）
 	$(PY) scripts/verify_rls.py
 
 .PHONY: test-parsers
-test-parsers: ## 只跑解析层测试
+test-parsers: ## 只跑解析层测试（不需要模型/数据库）
 	cd $(BACKEND) && ../$(PY) -m pytest tests/parsers -v
+
+.PHONY: parse-report
+parse-report: ## 生成解析质量报告（对 eval/fixtures 全部文件跑一遍）
+	$(PY) scripts/parse_report.py
+
+.PHONY: parse-baseline
+parse-baseline: ## 更新解析基线并检查回归
+	$(PY) scripts/parse_report.py --baseline
+
+.PHONY: fixtures
+fixtures: ## 重新生成合成测试素材
+	$(PY) scripts/make_fixtures.py
 
 .PHONY: lint
 lint: ## 代码检查
