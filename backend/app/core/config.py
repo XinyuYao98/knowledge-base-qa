@@ -83,7 +83,8 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     EMBED_BASE_URL: str = "http://127.0.0.1:1234/v1"
     EMBED_API_KEY: str = "lm-studio"
-    EMBED_MODEL: str = "qwen3-embedding-4b"
+    # 以服务端 /v1/models 返回的 id 为准，可能带 text-embedding- 前缀
+    EMBED_MODEL: str = "text-embedding-qwen3-embedding-4b"
     # 必须与库中已有向量一致；换值后须 make reindex
     EMBED_DIM: int = 2560
     # LM Studio 通常不支持 dimensions 参数；vLLM 需 --hf-overrides 开启 MRL
@@ -95,6 +96,20 @@ class Settings(BaseSettings):
     EMBED_QUERY_INSTRUCTION: str = (
         "Given a web search query, retrieve relevant passages that answer the query"
     )
+
+    # ------------------------------------------------------------------
+    # 生成模型（用户自带，OpenAI 兼容）
+    # ------------------------------------------------------------------
+    CHAT_BASE_URL: str = "http://127.0.0.1:1234/v1"
+    CHAT_MODEL: str = "qwen/qwen3.5-9b"
+    CHAT_API_KEY: str = "lm-studio"
+
+    # ------------------------------------------------------------------
+    # 本地模型服务必须绕开系统代理
+    # ------------------------------------------------------------------
+    # 实测：若系统设置了 HTTP_PROXY，httpx 默认会把 127.0.0.1 的请求
+    # 也转发给代理，导致 ReadTimeout。本地服务一律不走代理。
+    LLM_DISABLE_PROXY: bool = True
 
     # ------------------------------------------------------------------
     # Reranker 服务（本地，OpenAI 兼容 /v1/completions 或专用接口）
