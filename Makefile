@@ -93,10 +93,6 @@ dev: ## 启动后端（热重载）与索引 worker
 	@echo "提示：问答与索引需要模型服务在运行（见 README 启动顺序）"
 	$(PY) scripts/dev.py --host 127.0.0.1 --port 8080
 
-.PHONY: worker
-worker: ## 只启动索引 worker
-	cd $(BACKEND) && ../$(PY) -m app.workers.ingest_worker --concurrency 2
-
 .PHONY: web
 web: ## 启动前端开发服务器
 	cd frontend && npm run dev
@@ -111,6 +107,10 @@ test: ## 跑全部单元测试（不需要模型服务）
 .PHONY: test-db
 test-db: ## 跑需要真实数据库的测试（需先 db-up + db-init）
 	cd $(BACKEND) && ../$(PY) -m pytest -m db -v
+
+.PHONY: test-real
+test-real: ## 跑真模型端到端测试（需 LM Studio 加载 embedding 模型）
+	cd $(BACKEND) && ../$(PY) -m pytest -m "db and real_model" -v -s
 
 .PHONY: verify-rls
 verify-rls: ## 验证多租户 RLS 隔离是否真正生效（11 项检查）
@@ -131,6 +131,27 @@ parse-baseline: ## 更新解析基线并检查回归
 .PHONY: fixtures
 fixtures: ## 重新生成合成测试素材
 	$(PY) scripts/make_fixtures.py
+
+.PHONY: p4-setup
+p4-setup: ## P4：建测试用户与知识库
+	$(PY) scripts/index_cli.py setup
+
+.PHONY: p4-upload
+p4-upload: ## P4：上传并入队：make p4-upload FILE=path
+	@if [ -z "$(FILE)" ]; then echo "用法: make p4-upload FILE=<文件路径>"; exit 1; fi
+	$(PY) scripts/index_cli.py upload "$(FILE)"
+
+.PHONY: worker
+worker: ## 索引 worker（常驻）；make worker ONCE=1 跑一轮
+	$(PY) scripts/index_cli.py worker $(if $(ONCE),--once,)
+
+.PHONY: index-status
+index-status: ## 查看文档与任务状态
+	$(PY) scripts/index_cli.py status
+
+.PHONY: index-show
+index-show: ## 单文档详情：make index-show DOC=<doc_id>
+	$(PY) scripts/index_cli.py show $(DOC)
 
 .PHONY: spike
 spike: ## 竖切片端到端验证（需要 LM Studio 已加载 embedding + chat 模型）

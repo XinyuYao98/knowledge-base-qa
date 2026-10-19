@@ -73,6 +73,10 @@ asyncio_default_fixture_loop_scope = "function"
 # Windows 上 psycopg 不支持 ProactorEventLoop；交给 conftest 的插件统一替换
 testpaths = ["tests"]
 addopts = "-q"
+markers = [
+    "db: 需要真实 PostgreSQL（make test-db）",
+    "real_model: 需要 LM Studio 加载 embedding 模型（make test-real）",
+]
 
 [tool.ruff]
 line-length = 110
