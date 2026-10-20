@@ -72,8 +72,14 @@ def _encode(user_id: str, token_type: str, ttl: int) -> str:
     return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALG)
 
 
-def create_access_token(user_id: str) -> str:
-    return _encode(user_id, ACCESS, settings.ACCESS_TOKEN_TTL_SECONDS)
+def create_access_token(user_id: str, *, ttl_hours: int | None = None) -> str:
+    """签发 access token。
+
+    `ttl_hours` 为 P5 新增的可选参数：配置项 `JWT_ACCESS_TTL_HOURS`
+    允许不重启改有效期。不传时沿用原有 `ACCESS_TOKEN_TTL_SECONDS`。
+    """
+    ttl = ttl_hours * 3600 if ttl_hours else settings.ACCESS_TOKEN_TTL_SECONDS
+    return _encode(user_id, ACCESS, ttl)
 
 
 def create_refresh_token(user_id: str) -> str:

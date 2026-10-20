@@ -43,6 +43,7 @@ GRANT_STATEMENTS = [
     "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO {app_user}",
     "GRANT EXECUTE ON FUNCTION auth_lookup_user(text) TO {app_user}",
     "GRANT EXECUTE ON FUNCTION auth_get_user(uuid) TO {app_user}",
+    "GRANT EXECUTE ON FUNCTION auth_register(text, text) TO {app_user}",
 ]
 
 
@@ -88,6 +89,11 @@ def run_init(with_role: bool, app_user: str, app_password: str | None) -> int:
             for stmt in GRANT_STATEMENTS:
                 cur.execute(sql.SQL(stmt).format(app_user=sql.Identifier(app_user)))
             print("  ✓ 完成（NOBYPASSRLS，仅 DML 权限）")
+
+            # 003 含 {app_user} 占位符，必须在角色创建之后再执行
+            print("→ 执行 003_auth.sql（注册函数 / 登录审计表）")
+            cur.execute(_read("003_auth.sql").replace("{app_user}", app_user))
+            print("  ✓ 完成")
 
         # 自检：确认关键约束已生效
         _self_check(cur)

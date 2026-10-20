@@ -83,6 +83,21 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # 安全
     # ------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # JWT 与认证（P5）
+    # ------------------------------------------------------------------
+    #: P5 决策 A：24 小时、无 refresh token。
+    #: 演示场景够用；refresh 要多「刷新端点 + 存储 + 撤销」一整套。
+    JWT_ACCESS_TTL_HOURS: int = 24
+
+    # ------------------------------------------------------------------
+    # 限流（Redis 固定窗口）
+    # ------------------------------------------------------------------
+    RATE_LIMIT_LOGIN_PER_MINUTE: int = 10        # 按 IP
+    RATE_LIMIT_LOGIN_USER_ATTEMPTS: int = 5      # 按用户名
+    RATE_LIMIT_LOGIN_USER_WINDOW_SECONDS: int = 900   # 15 分钟
+    RATE_LIMIT_REGISTER_PER_HOUR: int = 5
+
     JWT_SECRET: str = Field(default="dev-only-change-me-in-production-please")
     JWT_ALG: str = "HS256"
     ACCESS_TOKEN_TTL_SECONDS: int = 900

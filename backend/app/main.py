@@ -21,6 +21,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.api.routes import api_router
 from app.core.config import settings
 from app.core.errors import AppError, ErrorClass
 from app.core.logging import bind_trace, configure_logging, current_trace_id, get_logger, new_trace_id
@@ -134,6 +135,10 @@ async def trace_middleware(request: Request, call_next: Any):
 # ---------------------------------------------------------------------------
 # 异常处理
 # ---------------------------------------------------------------------------
+# 业务路由（P5）
+app.include_router(api_router)
+
+
 @app.exception_handler(AppError)
 async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     log.warning(
