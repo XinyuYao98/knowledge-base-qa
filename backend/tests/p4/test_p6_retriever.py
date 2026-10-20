@@ -216,3 +216,48 @@ class TestCandidate:
         )
         d = c.to_dict()
         assert len(d["text"]) <= 120
+
+
+class TestChunkIdAlignment:
+    """Chroma 的 id 必须与 PG 的 chunk_id 一致。
+
+    这是 P6 实测发现的真实架构缺陷：
+    早期 Chroma 用 `{doc_id}_{seq}` 当 id，PG 用 UUID。
+    检索融合后按 UUID 回查原文 → 查不到 → BM25 命中的块全被丢掉。
+
+    **注意**：这个测试不走 _seed（它只写 BM25），而是直接验证 add_chunks 的 id 选择。
+    """
+
+    async def test_uses_chunk_id_when_present(self, kb: dict) -> None:
+        from app.rag.chunker import Chunk
+        from app.index import chroma_store
+
+        doc_id = uuid.uuid4()
+        real_ids = [str(uuid.uuid4()) for _ in range(3)]
+        chunks = [
+            Chunk(text=f"第{i}段内容", seq=i, chunk_id=real_ids[i], source="a.pdf")
+            for i in range(3)
+        ]
+        vectors = [[0.1 * (i + 1)] * settings.EMBED_DIM for i in range(3)]
+
+        n = chroma_store.add_chunks(kb["kb_id"], doc_id, chunks, vectors)
+        assert n == 3
+
+        col = chroma_store.get_or_create_collection(kb["kb_id"])
+        got = set(col.get(include=[])["ids"])
+        assert got == set(real_ids), f"Chroma 未使用 chunk_id：{got}"
+
+    async def test_falls_back_to_seq_when_missing(self, kb: dict) -> None:
+        """未回填 chunk_id 时要兜底，不能崩。"""
+        from app.rag.chunker import Chunk
+        from app.index import chroma_store
+
+        doc_id = uuid.uuid4()
+        chunks = [Chunk(text=f"第{i}段", seq=i, source="a.pdf") for i in range(2)]
+        vectors = [[0.2] * settings.EMBED_DIM for _ in range(2)]
+
+        chroma_store.add_chunks(kb["kb_id"], doc_id, chunks, vectors)
+
+        col = chroma_store.get_or_create_collection(kb["kb_id"])
+        got = set(col.get(include=[])["ids"])
+        assert got == {f"{doc_id}_0", f"{doc_id}_1"}

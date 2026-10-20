@@ -115,6 +115,11 @@ class Settings(BaseSettings):
     # 查询改写（D13）
     # ------------------------------------------------------------------
     REWRITE_MAX_TOKENS: int = 128
+    #: 答案生成的最大 token。500 字左右的答案够用
+    ANSWER_MAX_TOKENS: int = 900
+    #: 送进提示词的资料总字符上限。
+    #: 架构 §D1：5 条资料约 4000 token，折合中文约 6000 字符
+    CONTEXT_MAX_CHARS: int = 6000
     REWRITE_TIMEOUT_SECONDS: float = 5.0
 
     JWT_SECRET: str = Field(default="dev-only-change-me-in-production-please")
