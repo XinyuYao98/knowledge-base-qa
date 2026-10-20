@@ -45,6 +45,7 @@ from app.core.logging import get_logger
 from app.index import chroma_store
 from app.rag.models import EmbeddingClient, ModelServiceError
 from app.retrieval.bm25 import get_manager
+from app.retrieval.reranker import RerankResult, get_reranker
 from app.retrieval.rewriter import RewriteResult, rewrite
 from app.retrieval.rrf import FusedHit, fuse
 
@@ -78,6 +79,7 @@ class RetrievalResult:
     original_question: str
     candidates: list[Candidate]
     rewrite: RewriteResult | None = None
+    rerank: RerankResult | None = None
     vector_count: int = 0
     bm25_count: int = 0
     fused_count: int = 0
@@ -95,6 +97,7 @@ class RetrievalResult:
             "original_question": self.original_question,
             "candidates": [c.to_dict() for c in self.candidates],
             "rewrite": self.rewrite.to_dict() if self.rewrite else None,
+            "rerank": self.rerank.to_dict() if self.rerank else None,
             "vector_count": self.vector_count,
             "bm25_count": self.bm25_count,
             "fused_count": self.fused_count,
@@ -107,8 +110,13 @@ class RetrievalResult:
 class Retriever:
     """双路检索器。"""
 
-    def __init__(self, embedder: EmbeddingClient | None = None) -> None:
+    def __init__(
+        self,
+        embedder: EmbeddingClient | None = None,
+        reranker: Any | None = None,
+    ) -> None:
         self.embedder = embedder or EmbeddingClient()
+        self.reranker = reranker or get_reranker()
         self.bm25 = get_manager()
 
     async def retrieve(
@@ -172,8 +180,25 @@ class Retriever:
         candidates = await self._hydrate(fused, vec_results, kb_id, user_id)
         timings["hydrate"] = (time.perf_counter() - t0) * 1000
 
-        if final_top_k is not None:
-            candidates = candidates[:final_top_k]
+        # ---- 5. 精排 ----
+        # RRF 只看排名不看语义，用它选出候选；最后用 reranker 定顺序。
+        # 只在候选少于最终要的条数时跳过 —— 没必要重排 3 条取 5 条。
+        rerank_result: RerankResult | None = None
+        target = final_top_k if final_top_k is not None else settings.RETRIEVE_FINAL_TOP_K
+        if candidates and len(candidates) > target:
+            t0 = time.perf_counter()
+            rerank_result = await self.reranker.rerank(
+                question, [(c.chunk_id, c.text) for c in candidates]
+            )
+            timings["rerank"] = (time.perf_counter() - t0) * 1000
+            if rerank_result.degraded:
+                degraded.append(rerank_result.degraded)
+
+            # 按 rerank 分数重排
+            order = {h.chunk_id: i for i, h in enumerate(rerank_result.hits)}
+            candidates.sort(key=lambda c: order.get(c.chunk_id, len(order)))
+
+        candidates = candidates[:target]
 
         total = (time.perf_counter() - started) * 1000
         log.info(
@@ -191,6 +216,7 @@ class Retriever:
             original_question=original,
             candidates=candidates,
             rewrite=rw,
+            rerank=rerank_result,
             vector_count=len(vec_results),
             bm25_count=len(bm25_results),
             fused_count=len(fused),

@@ -98,3 +98,6 @@ docs/archive/
 
 # AI 工作日志（含环境细节，不属于项目交付物）
 .workbuddy/
+
+# pytest 临时目录（用 --basetemp=../.pytest_tmp 避开系统临时目录）
+.pytest_tmp/

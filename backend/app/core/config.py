@@ -165,6 +165,13 @@ class Settings(BaseSettings):
     RERANK_MODEL: str = "qwen3-reranker-0.6b"
     RERANK_TIMEOUT_SECONDS: float = 5.0
     RERANK_TOP_N: int = 5
+    #: 调用协议：
+    #: - auto：先试 /v1/rerank，失败回退 chat 打分（推荐，兼容性最好）
+    #: - endpoint：只用 /v1/rerank（vLLM / TEI 等支持该协议的服务）
+    #: - chat：只用 chat + 提示词打分（LM Studio 的常见形态）
+    RERANK_PROTOCOL: Literal["auto", "endpoint", "chat"] = "auto"
+    #: chat 打分时的并发数。逐对串行在 20 条候选下太慢。
+    RERANK_CONCURRENCY: int = 4
 
     # ------------------------------------------------------------------
     # 检索
