@@ -77,7 +77,15 @@ def add_chunks(
 ) -> int:
     """写入向量。返回写入条数。
 
-    id 用 `{doc_id}_{seq}`，保证幂等：同一文档重复写入会覆盖而非重复。
+    ## id 的选择（P6 修正）
+
+    优先用 `chunk.chunk_id`（= PG 的 `chunks.id`），**与 PG 对齐**。
+
+    早期版本固定用 `{doc_id}_{seq}`，导致检索时拿到的是 Chroma 自己的 id，
+    RRF 融合后再回 PG 查原文就查不到 —— BM25 命中的块全被丢掉。
+    实测确认后改为优先用 chunk_id。
+
+    兜底：chunk_id 为空时仍用 `{doc_id}_{seq}`（兼容未回填的调用方）。
     """
     if not chunks:
         return 0
@@ -86,7 +94,7 @@ def add_chunks(
 
     col = get_or_create_collection(kb_id)
     col.upsert(
-        ids=[f"{document_id}_{c.seq}" for c in chunks],
+        ids=[c.chunk_id or f"{document_id}_{c.seq}" for c in chunks],
         embeddings=vectors,
         documents=[c.text for c in chunks],
         metadatas=[

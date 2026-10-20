@@ -87,6 +87,36 @@ class Indexer:
         self.docs = DocumentRepo(session)
         self.chunks = ChunkRepo(session)
 
+    async def _backfill_chunk_ids(self, doc_id: str, chunks: list[Any]) -> None:
+        """从 PG 拉回真实 chunk_id，写进 Chunk 对象。
+
+        刚插入的 chunks 用的是 `gen_random_uuid()`，Python 侧不知道具体值，
+        所以插入后要按 `seq` 回查一次。
+
+        代价：一次 `SELECT id, seq` 查询（403 块约 2ms），
+        换来「向量索引与关系库 ID 严格对齐」，值得。
+        """
+        from sqlalchemy import text as sql_text
+
+        rows = await self.session.execute(
+            sql_text(
+                "SELECT id, seq FROM chunks WHERE document_id = :d ORDER BY seq"
+            ),
+            {"d": uuid.UUID(str(doc_id))},
+        )
+        by_seq = {int(m["seq"]): str(m["id"]) for m in rows.mappings().all()}
+
+        missing = 0
+        for c in chunks:
+            cid = by_seq.get(c.seq)
+            if cid is None:
+                missing += 1
+                continue
+            c.chunk_id = cid
+
+        if missing:
+            log.warning("chunk_id_backfill_missing", doc_id=doc_id, missing=missing)
+
     async def index(
         self,
         doc_id: str | uuid.UUID,
@@ -159,6 +189,10 @@ class Indexer:
         # ---- 写 Chroma（后） ----
         if chunks and vectors:
             try:
+                # **必须先回填 PG 的 chunk_id**，否则 Chroma 会用
+                # `{doc_id}_{seq}` 当 id，与 PG 的 UUID 对不上，
+                # 检索融合后无法回查原文（P6 实测踩到）。
+                await self._backfill_chunk_ids(doc_id_s, chunks)
                 chroma_store.add_chunks(kb_id, doc_id_s, chunks, vectors)
                 outcome.vector_count = len(vectors)
             except Exception as e:

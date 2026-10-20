@@ -98,6 +98,30 @@ class Settings(BaseSettings):
     RATE_LIMIT_LOGIN_USER_WINDOW_SECONDS: int = 900   # 15 分钟
     RATE_LIMIT_REGISTER_PER_HOUR: int = 5
 
+    # ------------------------------------------------------------------
+    # 检索（P6）
+    # ------------------------------------------------------------------
+    #: 两路召回各取多少（用户决策：Top 20）
+    RETRIEVE_VECTOR_TOP_K: int = 20
+    RETRIEVE_BM25_TOP_K: int = 20
+    #: RRF 融合后送给 reranker 的条数（架构 D1）
+    RETRIEVE_FUSE_TOP_K: int = 20
+    #: rerank 后最终进上下文的条数（架构 D1 v3.1：从 8 改为 5）
+    RETRIEVE_FINAL_TOP_K: int = 5
+    #: BM25 快照防抖落盘间隔（秒）
+    BM25_SAVE_DEBOUNCE_SECONDS: float = 5.0
+
+    # ------------------------------------------------------------------
+    # 查询改写（D13）
+    # ------------------------------------------------------------------
+    REWRITE_MAX_TOKENS: int = 128
+    #: 答案生成的最大 token。500 字左右的答案够用
+    ANSWER_MAX_TOKENS: int = 900
+    #: 送进提示词的资料总字符上限。
+    #: 架构 §D1：5 条资料约 4000 token，折合中文约 6000 字符
+    CONTEXT_MAX_CHARS: int = 6000
+    REWRITE_TIMEOUT_SECONDS: float = 5.0
+
     JWT_SECRET: str = Field(default="dev-only-change-me-in-production-please")
     JWT_ALG: str = "HS256"
     ACCESS_TOKEN_TTL_SECONDS: int = 900
@@ -146,6 +170,13 @@ class Settings(BaseSettings):
     RERANK_MODEL: str = "qwen3-reranker-0.6b"
     RERANK_TIMEOUT_SECONDS: float = 5.0
     RERANK_TOP_N: int = 5
+    #: 调用协议：
+    #: - auto：先试 /v1/rerank，失败回退 chat 打分（推荐，兼容性最好）
+    #: - endpoint：只用 /v1/rerank（vLLM / TEI 等支持该协议的服务）
+    #: - chat：只用 chat + 提示词打分（LM Studio 的常见形态）
+    RERANK_PROTOCOL: Literal["auto", "endpoint", "chat"] = "auto"
+    #: chat 打分时的并发数。逐对串行在 20 条候选下太慢。
+    RERANK_CONCURRENCY: int = 4
 
     # ------------------------------------------------------------------
     # 检索
