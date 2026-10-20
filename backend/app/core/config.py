@@ -98,6 +98,25 @@ class Settings(BaseSettings):
     RATE_LIMIT_LOGIN_USER_WINDOW_SECONDS: int = 900   # 15 分钟
     RATE_LIMIT_REGISTER_PER_HOUR: int = 5
 
+    # ------------------------------------------------------------------
+    # 检索（P6）
+    # ------------------------------------------------------------------
+    #: 两路召回各取多少（用户决策：Top 20）
+    RETRIEVE_VECTOR_TOP_K: int = 20
+    RETRIEVE_BM25_TOP_K: int = 20
+    #: RRF 融合后送给 reranker 的条数（架构 D1）
+    RETRIEVE_FUSE_TOP_K: int = 20
+    #: rerank 后最终进上下文的条数（架构 D1 v3.1：从 8 改为 5）
+    RETRIEVE_FINAL_TOP_K: int = 5
+    #: BM25 快照防抖落盘间隔（秒）
+    BM25_SAVE_DEBOUNCE_SECONDS: float = 5.0
+
+    # ------------------------------------------------------------------
+    # 查询改写（D13）
+    # ------------------------------------------------------------------
+    REWRITE_MAX_TOKENS: int = 128
+    REWRITE_TIMEOUT_SECONDS: float = 5.0
+
     JWT_SECRET: str = Field(default="dev-only-change-me-in-production-please")
     JWT_ALG: str = "HS256"
     ACCESS_TOKEN_TTL_SECONDS: int = 900
