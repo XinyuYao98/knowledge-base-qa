@@ -204,6 +204,20 @@ class Answerer:
         timings["generate"] = (time.perf_counter() - t0) * 1000
         answer_text = (result.get("content") or "").strip()
 
+        # ## 空正文必须报错，不能静默返回
+        #
+        # 实测踩到：本地 qwen3.5-9b 是推理模型，max_tokens 被推理吃光时
+        # `content` 为空、`finish_reason=length`。如果直接返回空字符串，
+        # 用户看到的是一个「成功的空回答」—— 比报错更难排查。
+        if not answer_text:
+            reasoning = result.get("reasoning_tokens", 0)
+            log.error("qa_empty_answer", reasoning_tokens=reasoning)
+            raise ModelServiceError(
+                "模型未产出答案"
+                + ("（推理过程占满了 token 预算）" if reasoning else "（返回内容为空）"),
+                detail={"reasoning_tokens": reasoning},
+            )
+
         # ---- 4. 引用校验 ----
         t0 = time.perf_counter()
         check = check_citations(answer_text, available=len(used))

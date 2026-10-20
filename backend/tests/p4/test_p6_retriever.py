@@ -229,8 +229,8 @@ class TestChunkIdAlignment:
     """
 
     async def test_uses_chunk_id_when_present(self, kb: dict) -> None:
-        from app.rag.chunker import Chunk
         from app.index import chroma_store
+        from app.rag.chunker import Chunk
 
         doc_id = uuid.uuid4()
         real_ids = [str(uuid.uuid4()) for _ in range(3)]
@@ -249,8 +249,8 @@ class TestChunkIdAlignment:
 
     async def test_falls_back_to_seq_when_missing(self, kb: dict) -> None:
         """未回填 chunk_id 时要兜底，不能崩。"""
-        from app.rag.chunker import Chunk
         from app.index import chroma_store
+        from app.rag.chunker import Chunk
 
         doc_id = uuid.uuid4()
         chunks = [Chunk(text=f"第{i}段", seq=i, source="a.pdf") for i in range(2)]

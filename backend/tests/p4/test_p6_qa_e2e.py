@@ -36,11 +36,43 @@ PDF = PUBLIC / "上海汇通能源股份有限公司2026年第三季度报告.pd
 
 
 def _model_ok() -> bool:
+    """检查生成模型是否可用。
+
+    ## 两种部署形态都要支持（P6 实测）
+
+    - **本地 LM Studio**：`/models` 列出已加载模型，可精确比对 id
+    - **云端 DeepSeek**：`/models` 可能不返回该 id，但 key 有效就能用
+
+    所以：能列出就用列表比对；列不出来就发一次极小的请求试探。
+    """
     try:
-        r = httpx.get(f"{settings.CHAT_BASE_URL}/models", trust_env=False, timeout=5.0)
-        return r.status_code == 200 and settings.CHAT_MODEL in [
-            m["id"] for m in r.json().get("data", [])
-        ]
+        r = httpx.get(
+            f"{settings.CHAT_BASE_URL}/models",
+            headers={"Authorization": f"Bearer {settings.CHAT_API_KEY}"},
+            trust_env=False,
+            timeout=5.0,
+        )
+        if r.status_code == 200:
+            ids = [m.get("id") for m in r.json().get("data", [])]
+            if settings.CHAT_MODEL in ids:
+                return True
+    except Exception:
+        pass
+
+    # 列表不可用或没有该模型 → 试探一次极小生成
+    try:
+        r = httpx.post(
+            f"{settings.CHAT_BASE_URL}/chat/completions",
+            headers={"Authorization": f"Bearer {settings.CHAT_API_KEY}"},
+            json={
+                "model": settings.CHAT_MODEL,
+                "messages": [{"role": "user", "content": "hi"}],
+                "max_tokens": 1,
+            },
+            trust_env=False,
+            timeout=20.0,
+        )
+        return r.status_code == 200
     except Exception:
         return False
 
@@ -214,6 +246,20 @@ class TestSingleTurnE2E:
         top_texts = " ".join(c.text for c in result.candidates[:3])
         assert "P-001" in top_texts, f"关键词没被精确召回：{[c.text[:30] for c in result.candidates[:3]]}"
 
+    async def test_answer_not_empty(self, kb: dict) -> None:
+        """正文不能为空。
+
+        实测踩到：推理模型在 max_tokens 被思考占满时返回空正文，
+        用户看到「成功的空回答」比报错更难排查。
+        """
+        answerer = Answerer()
+        ans = await answerer.answer(
+            kb["kb_id"], "二线城市住宿标准是多少？",
+            user_id=kb["user_id"], turn_count=1,
+        )
+        assert ans.answer.strip(), "答案正文为空"
+        assert len(ans.answer) > 5
+
     async def test_no_context_refusal(self, kb: dict) -> None:
         """完全无关的问题必须拒答，不能编造。"""
         answerer = Answerer()
@@ -281,7 +327,11 @@ class TestLatencyBudget:
         print(f"\n[实测] 流式：首 token {first_token_at:.1f}s，总 {total:.1f}s，事件 {events}")
 
         assert first_token_at is not None
-        assert first_token_at < 20.0, f"首 token {first_token_at:.1f}s 超过 20s 预算"
+        # 架构预算 20s，但实测 DeepSeek 只需 ~5s。
+        # 阈值收到 12s：留出网络抖动余量，同时能及早发现「模型变慢或换回推理模型」。
+        assert first_token_at < 12.0, (
+            f"首 token {first_token_at:.1f}s 超预期（实测基准 ~5s）"
+        )
         assert events >= 2
 
 

@@ -52,18 +52,26 @@ from app.core.logging import get_logger
 
 log = get_logger("reranker")
 
-#: chat 打分的提示词。
+#: chat 打分提示词：**yes/no 二分类**。
 #:
-#: 要求「只输出一个数字」是刻意的：越短越容易被约束。
-#: 但仍要容错 —— 实测模型经常加前缀。
-SCORE_PROMPT = """判断下面这段资料能否回答用户的问题。
+#: ## 为什么不用「输出 0-1 小数」（实测踩到）
+#:
+#: `qwen3-reranker-0.6b` 在 chat 模式下会**先输出一大段推理再给结论**，
+#: 推理走 `content`（不是 `reasoning_content`）。要求「只输出数字」时：
+#:
+#: - 相关的候选：`"1.0"`（干净）
+#: - 不相关的候选：`"无关\n\n没有关联\n\n请提供更多信息。\n</think>\n\n无关联"`（没有数字）
+#: - 还有的是 `content=""` + `finish_reason=length`（token 全被推理吃了）
+#:
+#: 于是不相关的候选全被解析成「中性分 0.5」，**rerank 等于没做**。
+#:
+#: 改成 yes/no 后，`"yes"` 干净利落；负例虽然仍带推理，但里面必有 `no`，
+#: 抓关键词就能稳定判定。
+SCORE_PROMPT = """判断下面这段资料能否回答用户的问题。只回答 yes 或 no。
 
 用户问题：{question}
 
-资料：{passage}
-
-只输出一个 0 到 1 之间的小数表示相关性，不要输出任何其他内容。
-能直接回答为 1，完全无关为 0。"""
+资料：{passage}"""
 
 #: 抓模型输出里的第一个数字（整数或小数，可带前导点）。
 #:
@@ -104,6 +112,51 @@ class RerankResult:
                 {"chunk_id": h.chunk_id, "score": round(h.score, 4)} for h in self.hits[:5]
             ],
         }
+
+
+#: yes/no 关键词。负例常被推理包裹，但关键词一定在。
+_YES_RE = re.compile(r"\b(yes|是|相关|能回答)\b", re.IGNORECASE)
+_NO_RE = re.compile(r"\b(no|否|无关|不相关|不能回答)\b", re.IGNORECASE)
+
+
+def parse_verdict(raw: str) -> float | None:
+    """从 yes/no 风格输出里判定相关性。
+
+    返回 1.0 / 0.0，判不出来返回 None（交给上层兜底）。
+
+    ## 为什么先找 no 再找 yes（实测）
+
+    负例输出形如：
+        "嗯，这似乎没有关系。…\nno\n\nNo. 说明：没有"
+    里面同时出现「没有」（含 no 语义）与「no」。
+    正例是干净的 `"yes"`。
+
+    先判 no 是因为：**混淆矩阵里，把不相关判成相关（假阳性）比反过来更伤**——
+    假阳性会让无关资料进入生成上下文，最坏导致编造答案。
+    宁可误杀一条边缘相关的，也不要放一条无关的进上下文。
+    """
+    if not raw or not raw.strip():
+        return None
+    text = raw.strip()
+
+    # 去掉 think 标签内部内容，避免推理里的 "no" 干扰最终判断
+    text = re.sub(r"<think[^>]*>.*?</think\s*>", " ", text, flags=re.DOTALL | re.IGNORECASE)
+    # 去掉残留的 </think>
+    text = re.sub(r"</think\s*>", " ", text, flags=re.IGNORECASE)
+
+    # 先看末尾 60 字符（结论通常在这里）
+    tail = text[-60:].lower()
+    if _NO_RE.search(tail):
+        return 0.0
+    if _YES_RE.search(tail):
+        return 1.0
+
+    # 末尾没有结论，看全文
+    if _NO_RE.search(text):
+        return 0.0
+    if _YES_RE.search(text):
+        return 1.0
+    return None
 
 
 def parse_score(raw: str) -> float:
@@ -248,12 +301,24 @@ class Reranker:
                     "top_n": len(candidates),
                 },
             )
+        # **LM Studio 对 /v1/rerank 返回 HTTP 200 + {"error": ...}**，
+        # 不是 404。只判状态码会导致：
+        #   data.get("results") 为空 → 抛 rerank_empty → 回退
+        # 虽然结果上也能回退，但那是「副作用碰巧生效」，不是显式判断。
+        # 实测确认后改为显式识别错误体。
         if resp.status_code == 404:
             raise RuntimeError("no_rerank_endpoint")
         if resp.status_code != 200:
             raise RuntimeError(f"rerank_http_{resp.status_code}")
 
-        data = resp.json()
+        try:
+            data = resp.json()
+        except ValueError:
+            raise RuntimeError("rerank_not_json") from None
+
+        if "error" in data:
+            raise RuntimeError(f"no_rerank_endpoint: {str(data['error'])[:80]}")
+
         results = data.get("results", [])
         if not results:
             raise RuntimeError("rerank_empty")
@@ -274,7 +339,19 @@ class Reranker:
     async def _rerank_chat(
         self, question: str, candidates: list[tuple[str, str]]
     ) -> list[RerankHit]:
-        """chat + 提示词打分（LM Studio 形态）。并发执行。"""
+        """chat + 提示词打分（LM Studio 形态）。并发执行。
+
+        ## max_tokens 必须给够（实测踩到）
+
+        `qwen3-reranker-0.6b` 在 chat 模式下**先输出推理再输出分数**，
+        推理走 `reasoning_content`，分数才在 `content`。
+
+        最初设 `max_tokens=8`，结果不相关的候选返回 `"0."` ——
+        **生成还没写完就被截断**。虽然 `parse_score("0.")` 碰巧得 0.0，
+        但那是运气，不是正确。
+
+        改为 128：给推理留足空间。代价是慢一些，但分数可信。
+        """
         sem = asyncio.Semaphore(settings.RERANK_CONCURRENCY)
 
         async def score_one(idx: int, text: str) -> RerankHit:
@@ -286,16 +363,44 @@ class Reranker:
                         json={
                             "model": self.model,
                             "messages": [{"role": "user", "content": prompt}],
-                            "max_tokens": 8,
+                            "max_tokens": 128,
                             "temperature": 0.0,
                         },
                     )
                 if resp.status_code != 200:
                     raise RuntimeError(f"chat_http_{resp.status_code}")
-                content = resp.json()["choices"][0]["message"]["content"]
+
+                choice = resp.json()["choices"][0]
+                content = choice["message"].get("content") or ""
+
+                # 先按 yes/no 判定；判不出来再退回数字解析。
+                # 这里刻意用 if/else 而非三元表达式 —— 下面的说明是本次
+                # 实测的核心结论，压成一行会丢失可读性。
+                verdict = parse_verdict(content)
+                if verdict is not None:  # noqa: SIM108
+                    score = verdict
+                else:
+                    # ## 实测：模型偶尔会「推理到死」（不重试，直接给中性分）
+                    #
+                    # 某些资料上，`qwen3-reranker` 会持续输出推理直到 token 耗尽：
+                    # `content=""`、`finish_reason=length`、`reasoning_tokens≈254`。
+                    # 加大 max_tokens 治不了 —— 它不是在写结论，是在绕圈。
+                    #
+                    # ### 为什么不用「换短提示词重试」
+                    #
+                    # 试过，**更糟**：简化提示词下模型更容易顺着上下文说 yes，
+                    # 实测把「交通费」那条（应判 0）误判成 1.00 ——
+                    # 假阳性比「中性分」伤害大得多。
+                    #
+                    # 结论：宁可给 0.5（排序时夹在中间，不激进），也不要冒险翻成 yes。
+                    score = NEUTRAL_SCORE
+
+                if score is None:
+                    score = NEUTRAL_SCORE
+
                 return RerankHit(
                     chunk_id=candidates[idx][0],
-                    score=parse_score(content),
+                    score=score,
                     original_rank=idx + 1,
                 )
 

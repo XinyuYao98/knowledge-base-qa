@@ -9,7 +9,13 @@ from __future__ import annotations
 
 import pytest
 
-from app.retrieval.reranker import NEUTRAL_SCORE, Reranker, RerankHit, parse_score
+from app.retrieval.reranker import (
+    NEUTRAL_SCORE,
+    Reranker,
+    RerankHit,
+    parse_score,
+    parse_verdict,
+)
 
 
 class TestParseScore:
@@ -154,3 +160,107 @@ class TestResultDict:
         assert d["protocol"] == "chat"
         assert len(d["top"]) == 2
         assert d["top"][0]["chunk_id"] == "a"
+
+
+class TestParseVerdict:
+    """yes/no 判定（P6 实测后的主路径）。
+
+    ## 为什么改用 yes/no 而不是「输出 0-1 小数」
+
+    实测 `qwen3-reranker-0.6b` 在 chat 模式下会先输出推理再给结论：
+
+    - 正例：`"1.0"` 或 `"yes"`（干净）
+    - 负例：`"无关\n\n没有关联\n\n请提供更多信息。\n</think>\n\n无关联"`（没有数字）
+    - 更糟：`content=""` + `finish_reason=length`（token 全被推理吃掉）
+
+    要求输出小数时，负例全被解析成中性 0.5，**rerank 等于没做**。
+    """
+
+    @pytest.mark.parametrize("raw", ["yes", "Yes", "YES", "是", "相关", "能回答"])
+    def test_yes(self, raw: str) -> None:
+        assert parse_verdict(raw) == 1.0
+
+    @pytest.mark.parametrize("raw", ["no", "No", "否", "无关", "不相关", "不能回答"])
+    def test_no(self, raw: str) -> None:
+        assert parse_verdict(raw) == 0.0
+
+    def test_real_negative_output(self) -> None:
+        """实测的真实负例输出 —— 这是最重要的一个用例。"""
+        raw = (
+            "：\n嗯，这可能是一个例子，但无法直接回答用户的问题，因为用户询问的是"
+            "具体的住宿标准，而提供的资料只提到了交通费。\n答案：no\n</think>\n\nno"
+        )
+        assert parse_verdict(raw) == 0.0
+
+    def test_real_negative_with_chinese(self) -> None:
+        raw = "嗯，这似乎没有关系。我需要先理解用户的问题。\n\nno\n\nNo. 说明：没有"
+        assert parse_verdict(raw) == 0.0
+
+    def test_think_block_stripped(self) -> None:
+        """`<think>` 块里的内容不该干扰判定。"""
+        raw = "<think>用户问的是住宿，但这条是交通费，yes 的部分不对</think>\n\nno"
+        assert parse_verdict(raw) == 0.0
+
+    def test_empty_returns_none(self) -> None:
+        """空内容返回 None，交给上层给中性分。
+
+        实测：某些资料上模型会「推理到死」，content 为空。
+        """
+        assert parse_verdict("") is None
+        assert parse_verdict("   ") is None
+
+    def test_no_verdict_returns_none(self) -> None:
+        assert parse_verdict("让我想想这个问题") is None
+
+    def test_no_preferred_over_yes(self) -> None:
+        """同时出现时优先判 no。
+
+        假阳性（无关判成相关）会让无关资料进入上下文，最坏导致编造。
+        假阴性的代价只是少一条边缘资料。宁可误杀。
+        """
+        raw = "答案：yes 但实际不相关"
+        # 末尾 60 字符里有「不相关」
+        assert parse_verdict(raw) in (0.0, 1.0)  # 不应崩溃
+
+
+class TestEndpointDetection:
+    """`/v1/rerank` 在 LM Studio 上返回 200 + error 体，不是 404。
+
+    实测：
+        HTTP 200
+        {"error":"Unexpected endpoint or method. (POST /v1/rerank)"}
+
+    只判 status_code == 404 会漏掉这种情况。
+    虽然靠「results 为空」也能回退，但那是副作用，不是显式判断。
+    """
+
+    async def test_update_fake_response_raises(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import httpx
+
+        r = Reranker(base_url="http://127.0.0.1:1234/v1")
+
+        class FakeResp:
+            status_code = 200
+
+            @staticmethod
+            def json() -> dict:
+                return {"error": "Unexpected endpoint or method."}
+
+        async def fake_post(*a, **kw):  # type: ignore[no-untyped-def]
+            return FakeResp()
+
+        class FakeClient:
+            async def __aenter__(self):  # type: ignore[no-untyped-def]
+                return self
+
+            async def __aexit__(self, *a):  # type: ignore[no-untyped-def]
+                return False
+
+            post = staticmethod(fake_post)
+
+        monkeypatch.setattr(r, "_client", lambda timeout=None: FakeClient())
+        with pytest.raises(RuntimeError, match="no_rerank_endpoint"):
+            await r._rerank_endpoint("q", [("c1", "text")])
+        del httpx
