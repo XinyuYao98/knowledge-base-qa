@@ -264,7 +264,9 @@ class Retriever:
         from app.db.session import get_session_factory, set_session_user
 
         by_id: dict[str, dict[str, Any]] = {h["id"]: h for h in vec_results}
-        missing = [f.chunk_id for f in fused if f.chunk_id not in by_id]
+        # **所有**候选都要补 filename：Chroma 的 metadata 里没有这个字段，
+        # 只有 BM25 命中的才需要补文本，但文件名两类候选都缺。
+        missing = [f.chunk_id for f in fused]
 
         # 缺的从 PG 补。
         #
@@ -280,11 +282,17 @@ class Retriever:
             factory = get_session_factory()
             async with factory() as s, s.begin():
                 await set_session_user(s, user_id)
+                # 顺带 JOIN 出文件名 —— Chroma 里没存 filename，
+                # 导致引用只能显示「资料 · 第1页」而不是「某报告 · 第1页」。
+                # 用户靠 label 找原文，缺文件名等于引用不可用。
                 rows = await s.execute(
                     text(
-                        "SELECT id, text, page_from, sheet_name, heading_path, "
-                        "       chunk_type, row_range, document_id "
-                        "  FROM chunks WHERE id = ANY(:ids)"
+                        "SELECT c.id, c.text, c.page_from, c.sheet_name, "
+                        "       c.heading_path, c.chunk_type, c.row_range, "
+                        "       c.document_id, d.filename "
+                        "  FROM chunks c "
+                        "  LEFT JOIN documents d ON d.id = c.document_id "
+                        " WHERE c.id = ANY(:ids)"
                     ),
                     {"ids": [uuid.UUID(c) for c in missing if _is_uuid(c)]},
                 )
@@ -298,6 +306,7 @@ class Retriever:
                             "chunk_type": m["chunk_type"],
                             "row": m["row_range"],
                             "document_id": str(m["document_id"]),
+                            "filename": m["filename"] or "",
                         },
                     }
 
@@ -305,6 +314,14 @@ class Retriever:
         for f in fused:
             v = by_id.get(f.chunk_id)
             if v is not None:
+                meta = dict(v.get("metadata", {}))
+                # 用 PG 的 filename 覆盖（Chroma 里没有）
+                if f.chunk_id in pg_rows:
+                    meta["filename"] = pg_rows[f.chunk_id]["metadata"].get("filename", "")
+                if "document_id" not in meta or not meta.get("document_id"):
+                    meta["document_id"] = pg_rows.get(f.chunk_id, {}).get(
+                        "metadata", {}
+                    ).get("document_id", "")
                 out.append(
                     Candidate(
                         chunk_id=f.chunk_id,
@@ -312,7 +329,7 @@ class Retriever:
                         rrf_score=f.rrf_score,
                         hit_count=f.hit_count,
                         sources=f.sources,
-                        metadata=v.get("metadata", {}),
+                        metadata=meta,
                     )
                 )
                 continue
