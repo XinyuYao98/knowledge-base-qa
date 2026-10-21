@@ -270,7 +270,24 @@ def main() -> int:
                         mark = "↓" if delta < 0 else "↑"
                         print(f"  {mark} {fname}: 字符 {prev['total_chars']} → {cur['total_chars']} ({pct:+.1f}%)")
                         if pct < -20:
-                            regressions.append(f"{fname}: 字符数下降 {abs(pct):.0f}%")
+                            # ## 不能一律判回归（P7 实测）
+                            #
+                            # 表格 PDF 的字符数可能**因为去重而下降**：
+                            # 旧解析把同一张表同时输出成 paragraph（压平的整表）
+                            # 和 table（结构化的），字符数被算了两遍。
+                            # 剔除重复后总量掉 40% 是**修复**，不是回归。
+                            #
+                            # 区分办法：表格数 > 0 的文件，字符下降 ± 表格重复
+                            # 是合理的；没有表格的文件下降才是真回归。
+                            if cur.get("table_count", 0) > 0:
+                                print(
+                                    f"       （含 {cur['table_count']} 张表，"
+                                    f"下降可能来自表格去重，请人工确认）"
+                                )
+                            else:
+                                regressions.append(
+                                    f"{fname}: 字符数下降 {abs(pct):.0f}%"
+                                )
             if regressions:
                 print("\n  ⚠ 疑似回归：")
                 for r in regressions:

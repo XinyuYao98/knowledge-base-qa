@@ -23,11 +23,35 @@ def para(text: str, **kw) -> Block:
 
 
 def table(header: str, rows: list[str], **kw) -> Block:
+    """构造表格块，**同时填 text 与 cells**。
+
+    ## 为什么必须填 cells（P8 发现）
+
+    P8 之后表格切块改为按 `cells` 重建行 —— 因为按 `text` 的 `\\n` 分行会把
+    跨行的项目名切断（`归属于上市公司股东的扣除非` / `经常性损益的净利润`），
+    实测最坏的一块项目名只剩「的冲销部分」。
+
+    这个测试辅助函数原本只填了表头 cells，数据行只有 text。
+    旧实现按 text 切所以能过；新实现按 cells 重建，数据行就空了。
+
+    **这是测试数据不完整，不是实现有问题** —— 真实解析器的 cells 是完整的。
+    补齐后，测试同时覆盖 text 与 cells 两条路径的一致性。
+    """
     text = header + "\n" + "\n".join(rows)
+
+    cells: list[TableCell] = [
+        TableCell(text=h, row=0, col=i, is_header=True)
+        for i, h in enumerate(header.split(" | "))
+    ]
+    for r, row in enumerate(rows, start=1):
+        for c, val in enumerate(row.split(" | ")):
+            if val.strip():
+                cells.append(TableCell(text=val.strip(), row=r, col=c))
+
     return Block(
         type=BlockType.TABLE,
         text=text,
-        cells=[TableCell(text=h, row=0, col=i, is_header=True) for i, h in enumerate(header.split(" | "))],
+        cells=cells,
         header_rows=1,
         **kw,
     )
@@ -86,8 +110,22 @@ class TestLongSplit:
 
 
 class TestTableChunking:
-    def test_row_chunks_repeat_header(self) -> None:
-        """表格每行必须带表头 —— 否则 1280 是单价还是数量无从判断。"""
+    def test_table_is_one_chunk_with_column_names(self) -> None:
+        """整张表一个块，块内显式声明列名 —— 否则 1280 是单价还是数量无从判断。
+
+        ## 断言为什么变了两次
+
+        **P8 第一版**按行切，每行一块：
+            产品编号 | 名称 | 单价
+            P-001 | 智能网关 | 1280
+
+        **P8 定稿**改回整表一块（按行切让评测从 78.9% 掉到 74.3%）：
+            列：产品编号 / 名称 / 单价
+            P-001 | 智能网关 | 1280
+            P-002 | 边缘控制器 | 2450
+
+        要防的东西没变（**列名不能丢**），只是承载形式变了。
+        """
         doc = make_doc(
             table(
                 "产品编号 | 名称 | 单价",
@@ -95,9 +133,12 @@ class TestTableChunking:
             )
         )
         chunks = chunk_document(doc)
-        assert len(chunks) == 2
-        for c in chunks:
-            assert "产品编号 | 名称 | 单价" in c.text
+        assert len(chunks) == 1, "一张表应该是一个块"
+
+        text = chunks[0].text
+        assert text.startswith("列：产品编号 / 名称 / 单价")
+        assert "P-001 | 智能网关 | 1280" in text
+        assert "P-002 | 边缘控制器 | 2450" in text
 
     def test_chunk_type_table_row(self) -> None:
         doc = make_doc(table("A | B", ["1 | 2"]))
