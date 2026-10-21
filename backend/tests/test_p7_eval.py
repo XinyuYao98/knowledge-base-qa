@@ -232,3 +232,49 @@ class TestResultsFormat:
         s = first["summary"]
         assert s["total"] > 0
         assert 0 <= s["pass_rate"] <= 1
+
+
+class TestStability:
+    """稳定性 —— P7 最重要的发现。
+
+    同一配置跑两次，109 条里有 24 条结果不同（22%）。
+    后来用 3×40 精确测：一致率 92.5%，抖动 3 条。
+
+    **稳定性是评测结论的前提**：如果单次波动 7%，
+    那「A 比 B 高 3%」这类结论都不该采信。
+    """
+
+    def test_unstable_detection(self) -> None:
+        runs = [
+            {"a": True, "b": True, "c": False},
+            {"a": True, "b": False, "c": False},
+            {"a": True, "b": True, "c": True},
+        ]
+        ids = list(runs[0])
+        unstable = [cid for cid in ids if len({r[cid] for r in runs}) > 1]
+        assert unstable == ["b", "c"]
+
+    def test_all_stable(self) -> None:
+        runs = [{"a": True}, {"a": True}, {"a": True}]
+        ids = list(runs[0])
+        unstable = [cid for cid in ids if len({r[cid] for r in runs}) > 1]
+        assert unstable == []
+
+    def test_consistent_rate_below_threshold(self) -> None:
+        """抖动率 <5% 才算通过 —— 与 cmd_stability 的判定一致。"""
+        n, unstable = 40, 3
+        assert (n - unstable) / n >= 0.925
+
+    def test_cases_expanded(self) -> None:
+        cases = load_cases()
+        assert len(cases) >= 100, f"评测集应已扩到 100+，当前 {len(cases)}"
+
+    def test_retrieved_ids_field_exists(self) -> None:
+        """必须记录候选快照 —— 否则分不清波动来自检索还是生成。"""
+        from app.eval.runner import CaseResult
+
+        r = CaseResult(
+            case_id="x", category="normal", question="q", passed=True,
+            retrieved_ids=["a", "b"],
+        )
+        assert r.to_dict()["retrieved_ids"] == ["a", "b"]

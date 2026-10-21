@@ -306,6 +306,12 @@ class CaseResult:
     citations_count: int = 0
     refused: bool = False
 
+    #: 检索到的候选 chunk_id 列表（按最终顺序）。
+    #:
+    #: **必须记录**：P7 稳定性实验发现「同配置两次结果差 22%」，
+    #: 没有候选快照就分不清是「检索变了」还是「生成变了」。
+    retrieved_ids: list[str] = field(default_factory=list)
+
     # 性能
     duration_ms: float = 0.0
     retrieve_ms: float = 0.0
@@ -329,6 +335,7 @@ class CaseResult:
             "citations_attempted": self.citations_attempted,
             "citations_count": self.citations_count,
             "refused": self.refused,
+            "retrieved_ids": self.retrieved_ids,
             "duration_ms": round(self.duration_ms, 1),
             "retrieve_ms": round(self.retrieve_ms, 1),
             "generate_ms": round(self.generate_ms, 1),
@@ -501,6 +508,9 @@ async def run_case(case: Case, env: EvalEnv, answerer: Answerer) -> CaseResult:
     tim = ans.timings or {}
     r.retrieve_ms = tim.get("retrieve", 0.0)
     r.generate_ms = tim.get("generate", 0.0)
+
+    if ans.retrieval:
+        r.retrieved_ids = [c.chunk_id for c in ans.retrieval.candidates]
 
     # 检索指标
     if ans.retrieval and case.expect_doc:

@@ -177,6 +177,67 @@ async def cmd_compare(args: argparse.Namespace) -> int:
     return 0
 
 
+async def cmd_stability(args: argparse.Namespace) -> int:
+    """稳定性实验：同一配置重复跑，看结果波动。
+
+    ## 为什么必须做这个
+
+    P7 第一次对照实验里，同一个 no-rerank 配置跑了两次：
+    第一次 92/109、第二次 86/109 —— **差 6 条**。
+
+    如果单次结果就波动 5%，那任何「A 比 B 高 7%」的结论都不可信。
+    稳定性是评测结论的前提。
+    """
+    cases = load_cases()[: args.limit]
+    cfg = EvalConfig(name="stability")
+
+    runs: list[dict[str, bool]] = []
+    answers: list[dict[str, str]] = []
+
+    for i in range(args.repeat):
+        print(f"\n▶ 第 {i + 1}/{args.repeat} 轮")
+        data = await _run_one(cfg, cases)
+        runs.append({r["case_id"]: r["passed"] for r in data["results"]})
+        answers.append({r["case_id"]: r["answer"] for r in data["results"]})
+
+    ids = list(runs[0].keys())
+    unstable = [cid for cid in ids if len({run[cid] for run in runs}) > 1]
+    always_pass = [cid for cid in ids if all(run[cid] for run in runs)]
+    always_fail = [cid for cid in ids if not any(run[cid] for run in runs)]
+
+    n = len(ids)
+    print(f"\n{'=' * 62}")
+    print(f"稳定性实验：{args.repeat} 轮 × {n} 条")
+    print(f"  每轮通过数：{[sum(r.values()) for r in runs]}")
+    print(f"  稳定通过：{len(always_pass)}  稳定失败：{len(always_fail)}  抖动：{len(unstable)}")
+    print(f"  **一致率：{(n - len(unstable)) / n:.1%}**")
+
+    if unstable:
+        print(f"\n抖动用例（{len(unstable)} 条）：")
+        for cid in unstable[:10]:
+            pattern = "".join("✓" if run[cid] else "✗" for run in runs)
+            print(f"  {cid}: {pattern}")
+
+    path = _out_path("stability")
+    path.write_text(
+        json.dumps(
+            {
+                "repeat": args.repeat,
+                "total": n,
+                "consistent": n - len(unstable),
+                "unstable": unstable,
+                "runs": runs,
+                "answers": answers,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    print(f"\n详情已保存：{path}")
+    return 0 if len(unstable) / n < 0.05 else 1
+
+
 def cmd_report(_args: argparse.Namespace) -> int:
     if not RESULTS_DIR.exists():
         print("还没有评测结果")
@@ -217,6 +278,11 @@ def main() -> int:
 
     rp = sub.add_parser("report", help="列出历史结果")
     rp.set_defaults(func=cmd_report)
+
+    st = sub.add_parser("stability", help="稳定性实验：同配置跑 N 遍")
+    st.add_argument("--repeat", type=int, default=3)
+    st.add_argument("--limit", type=int, default=40)
+    st.set_defaults(func=cmd_stability)
 
     args = ap.parse_args()
 
