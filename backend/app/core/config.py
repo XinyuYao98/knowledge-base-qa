@@ -31,7 +31,12 @@ class Settings(BaseSettings):
     APP_ENV: Literal["dev", "staging", "prod"] = "dev"
     LOG_LEVEL: str = "INFO"
     API_PREFIX: str = "/api/v1"
-    CORS_ORIGINS: str = "http://localhost:3000"
+    #: 前端开发端口。Vite 默认 5173。
+    #:
+    #: **localhost 与 127.0.0.1 必须都放行** —— 浏览器按「协议+主机+端口」
+    #: 三元组判定同源，这两个主机名视为不同源。
+    #: 实测踩到：.env 里原本写的是 3002，Vite 是 5173，前端第一个请求就被 CORS 拦。
+    CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     # ------------------------------------------------------------------
     # 数据库

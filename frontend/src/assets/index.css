@@ -1,0 +1,118 @@
+@import "tailwindcss";
+
+/*
+ * ## shadcn 主题变量（neutral / new-york）
+ *
+ * 变量取自官方注册表 https://shadcn-vue.com/r/colors/neutral.json 的
+ * `cssVarsV4` 字段（Tailwind 4 用 oklch 表示，比 HSL 多了感知均匀的好处）。
+ *
+ * **不要手改这些值**。组件里写的是 `bg-background` / `text-muted-foreground` /
+ * `border-border`，它们通过下面的 `@theme inline` 映射到变量；
+ * 改错任何一个都会让组件变色或失形。
+ *
+ * 主色是 `--primary` = oklch(0.205 0 0)，即**中性近黑**，不是蓝色。
+ * 原因见 docs/07-前端技术架构.md §8.3：
+ *   1. shadcn 的观感是「黑白灰 + 细边框 + 大留白」，蓝主色会偏离基调
+ *   2. 这个 RAG 界面里该抢注意力的是引用卡片和状态徽标，主色再蓝会打架
+ */
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --radius: 0.625rem;
+
+  /* ## 业务状态色（本项目追加，非 shadcn 自带）
+   *
+   * 只用在三处，不要拿去做通用配色：
+   *   1. 文档索引状态徽标（处理中 / 可用 / 失败）
+   *   2. 流式输出的光标
+   *   3. 引用校验失败的警示条（caveat）
+   */
+  --status-ready: oklch(0.55 0.13 155);
+  --status-ready-bg: oklch(0.96 0.03 155);
+  --status-busy: oklch(0.62 0.19 255);
+  --status-busy-bg: oklch(0.96 0.02 255);
+  --status-failed: oklch(0.577 0.245 27.325);
+  --status-failed-bg: oklch(0.96 0.03 25);
+}
+
+/*
+ * `@theme inline` 把上面的 CSS 变量映射成 Tailwind 工具类：
+ *   --color-background → bg-background / text-background / border-background
+ *
+ * **必须是 `inline`**：普通 `@theme` 会做静态替换，
+ * 导致将来加暗色主题时变量不跟随。inline 保留变量引用。
+ */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-status-ready: var(--status-ready);
+  --color-status-ready-bg: var(--status-ready-bg);
+  --color-status-busy: var(--status-busy);
+  --color-status-busy-bg: var(--status-busy-bg);
+  --color-status-failed: var(--status-failed);
+  --color-status-failed-bg: var(--status-failed-bg);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  *,
+  ::after,
+  ::before {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    /* 中文字体栈：优先系统中文字体，避免网络字体的闪烁与拖慢首屏 */
+    font-family:
+      -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial,
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* 细滚动条，贴近 shadcn 的低对比风格 */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+}
