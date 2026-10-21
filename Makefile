@@ -97,6 +97,22 @@ dev: ## 启动后端（热重载）与索引 worker
 web: ## 启动前端开发服务器
 	cd frontend && npm run dev
 
+.PHONY: web-install
+web-install: ## 安装前端依赖（首次）
+	cd frontend && npm install
+
+.PHONY: web-build
+web-build: ## 构建前端（类型检查 + 打包）
+	cd frontend && npm run build
+
+.PHONY: web-lint
+web-lint: ## 前端 lint
+	cd frontend && npm run lint
+
+.PHONY: web-api
+web-api: ## 从后端拉 OpenAPI 并重新生成前端类型（后端改了接口后必须跑）
+	cd frontend && npm run gen:api
+
 # ---------------------------------------------------------------------------
 # 测试与质量
 # ---------------------------------------------------------------------------
