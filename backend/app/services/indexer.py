@@ -87,6 +87,22 @@ class Indexer:
         self.docs = DocumentRepo(session)
         self.chunks = ChunkRepo(session)
 
+    def _add_to_bm25(self, kb_id: str, chunks: list[Any]) -> None:
+        """把 chunk 加入 BM25 内存索引。
+
+        **失败不影响索引整体成功**：BM25 是派生索引，
+        可以从 PG 全量重建（重启后由懒加载 + 快照恢复）。
+        但必须打日志，否则又是「静默失效」。
+        """
+        from app.retrieval.bm25 import get_manager
+
+        try:
+            items = [(c.chunk_id, c.text) for c in chunks if c.chunk_id and c.text]
+            n = get_manager().add_documents(kb_id, items)
+            log.info("bm25_added", kb_id=kb_id, count=n)
+        except Exception as e:
+            log.warning("bm25_add_failed", kb_id=kb_id, err=type(e).__name__)
+
     async def _backfill_chunk_ids(self, doc_id: str, chunks: list[Any]) -> None:
         """从 PG 拉回真实 chunk_id，写进 Chunk 对象。
 
@@ -195,6 +211,13 @@ class Indexer:
                 await self._backfill_chunk_ids(doc_id_s, chunks)
                 chroma_store.add_chunks(kb_id, doc_id_s, chunks, vectors)
                 outcome.vector_count = len(vectors)
+
+                # ---- 写 BM25 ----
+                # **P6 漏了这一步**：indexer 从来没把 chunk 喂给 BM25，
+                # 导致真实索引后关键词通道永远是空的（评测里 bm25=0）。
+                # P6 的单测是手动 add_documents 喂的，所以测试全绿但功能不通。
+                # 这里的教训：测试通过 ≠ 链路接通，要有端到端断言。
+                self._add_to_bm25(kb_id, chunks)
             except Exception as e:
                 # Chroma 失败不回滚 PG：PG 有数据只影响检索，可重跑修复
                 log.exception("chroma_write_failed", doc_id=doc_id_s)

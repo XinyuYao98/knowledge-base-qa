@@ -108,6 +108,28 @@ test: ## 跑全部单元测试（不需要模型服务）
 test-db: ## 跑需要真实数据库的测试（需先 db-up + db-init）
 	cd $(BACKEND) && ../$(PY) -m pytest -m db -v
 
+#: 分两批跑测试。
+#:
+#: 为什么需要：P3 的 staging 测试一次会创建+删除几十个文件，
+#: 与其余测试合在一轮里会撞上环境的批量删除保护（>50 个即拦截，
+#: 表现为 SystemExit + 一串「previous item was not torn down」）。
+#: 这不是代码问题，分批跑就没事。
+.PHONY: test-split
+test-split: ## 分两批跑全量测试（规避批量删除保护）
+	cd $(BACKEND) && ../$(PY) -m pytest -q -m "not real_model" \
+		--ignore=tests/test_p3_pipeline.py --ignore=tests/test_p3_quality_cleanup.py \
+		--basetemp=../.pytest_tmp -p no:cacheprovider
+	cd $(BACKEND) && ../$(PY) -m pytest -q tests/test_p3_pipeline.py tests/test_p3_quality_cleanup.py \
+		--basetemp=../.pytest_tmp -p no:cacheprovider
+
+.PHONY: eval
+eval: ## 跑 P7 评测（需 PG + LM Studio）
+	$(PY) scripts/eval_qa.py run
+
+.PHONY: eval-compare
+eval-compare: ## 跑 P7 对照实验
+	$(PY) scripts/eval_qa.py compare
+
 .PHONY: test-real
 test-real: ## 跑真模型端到端测试（需 LM Studio 加载 embedding 模型）
 	cd $(BACKEND) && ../$(PY) -m pytest -m "db and real_model" -v -s

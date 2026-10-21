@@ -164,7 +164,18 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # Reranker 服务（本地，OpenAI 兼容 /v1/completions 或专用接口）
     # ------------------------------------------------------------------
-    RERANK_ENABLED: bool = True
+    #: **P7 评测后默认关闭**。
+    #:
+    #: 对照实验（26 条用例）：开 rerank 84.6%、关 rerank 88.5%，
+    #: 且关掉后 p50 从 9.0s 降到 0.8s。
+    #:
+    #: 原因：qwen3-reranker 在 chat 模式下只能 yes/no 二分类
+    #: （P6 决定），它回答的是「这段能不能回答问题」，
+    #: 而 RAG 需要「这段有多大程度相关」——两者不是一回事。
+    #:
+    #: 要重新开启，先补足评测集（当前 26 条，1 条差异 = 3.8%，
+    #: 统计效力不足）并换用支持连续分的回 /v1/rerank 协议。
+    RERANK_ENABLED: bool = False
     RERANK_BASE_URL: str = "http://127.0.0.1:1234/v1"
     RERANK_API_KEY: str = "lm-studio"
     RERANK_MODEL: str = "qwen3-reranker-0.6b"
@@ -179,12 +190,13 @@ class Settings(BaseSettings):
     RERANK_CONCURRENCY: int = 4
 
     # ------------------------------------------------------------------
-    # 检索
+    # 检索（补充项）
     # ------------------------------------------------------------------
+    # 注意：RETRIEVE_* 的 top-k 定义在上面的「检索（P6）」段，
+    # 这里只保留 P1 时代就有的、P6 没用到的参数。
+    # **不要再重复定义同名项** —— P7 清理时发现 VECTOR_TOP_K 被定义了两次，
+    # 改上面那个不生效（pydantic 以后定义的为准），排查了半小时。
     RRF_K: int = 60
-    RETRIEVE_VECTOR_TOP_K: int = 20
-    RETRIEVE_BM25_TOP_K: int = 20
-    RETRIEVE_FINAL_TOP_K: int = 5
     RETRIEVE_MIN_SCORE: float = 0.15
     RETRIEVAL_TIMEOUT_SECONDS: float = 5.0
     ENABLE_KEYWORD_CHANNEL: bool = True
